@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useProperty } from "@/contexts/property-context";
+import { useAuth } from "@/contexts/auth-context";
 
 // Admin/staff nav items
 const adminNavItems = [
@@ -63,6 +64,7 @@ function NavIcon({ name, className }: { name: string; className?: string }) {
 export function Sidebar() {
   const pathname = usePathname();
   const { propertyId, currentProperty, role } = useProperty();
+  const { user } = useAuth();
 
   if (!propertyId) return null;
 
@@ -108,6 +110,22 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Footer — back to properties list */}
+      <div className="p-3 border-t border-gray-200">
+        <Link
+          href="/properties"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
+          </svg>
+          All properties
+        </Link>
+        {user?.email && (
+          <p className="mt-2 px-3 text-xs text-gray-400 truncate">{user.email}</p>
+        )}
+      </div>
     </aside>
   );
 }
