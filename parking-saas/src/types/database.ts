@@ -398,6 +398,54 @@ export type Database = {
           },
         ]
       }
+      org_invites: {
+        Row: {
+          id: string
+          email: string
+          token: string
+          invited_by: string | null
+          created_at: string
+          expires_at: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          id?: string
+          email: string
+          token?: string
+          invited_by?: string | null
+          created_at?: string
+          expires_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          id?: string
+          email?: string
+          token?: string
+          invited_by?: string | null
+          created_at?: string
+          expires_at?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_admins: {
+        Row: {
+          user_id: string
+          created_at: string
+        }
+        Insert: {
+          user_id: string
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
       unit_members: {
         Row: {
           created_at: string
@@ -614,6 +662,18 @@ export type Database = {
       get_unit_claim_codes: {
         Args: { p_property_id: string }
         Returns: Json
+      }
+      create_org_invite: {
+        Args: { p_email: string }
+        Returns: { token: string; expires_at: string }[]
+      }
+      validate_org_invite: {
+        Args: { p_token: string }
+        Returns: { email: string; is_valid: boolean; message: string }[]
+      }
+      consume_org_invite: {
+        Args: { p_token: string }
+        Returns: boolean
       }
     }
     Enums: {

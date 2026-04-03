@@ -19,12 +19,6 @@ export default function HomePage() {
             Sign in
           </Link>
           <Link
-            href="/signup"
-            className="bg-white text-gray-700 rounded-lg px-6 py-2.5 text-sm font-medium border border-gray-300 hover:bg-gray-50 transition-colors"
-          >
-            Property manager signup
-          </Link>
-          <Link
             href="/claim"
             className="bg-green-600 text-white rounded-lg px-6 py-2.5 text-sm font-medium hover:bg-green-700 transition-colors"
           >
