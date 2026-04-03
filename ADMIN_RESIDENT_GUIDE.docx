@@ -1,0 +1,529 @@
+
+const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, AlignmentType, WidthType, BorderStyle, ShadingType } = require('docx');
+const fs = require('fs');
+
+const border = { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" };
+const borders = { top: border, bottom: border, left: border, right: border };
+
+const doc = new Document({
+  styles: {
+    default: { document: { run: { font: "Arial", size: 22 } } },
+    paragraphStyles: [
+      { id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 32, bold: true, font: "Arial", color: "1F4E78" },
+        paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 0 } },
+      { id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 28, bold: true, font: "Arial", color: "2E75B6" },
+        paragraph: { spacing: { before: 180, after: 100 }, outlineLevel: 1 } },
+    ]
+  },
+  sections: [{
+    properties: { page: { margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 } } },
+    children: [
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        children: [new TextRun("Parking SaaS: Admin & Resident Guide")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("This guide explains how to use both the admin dashboard (property management) and resident portal (vehicle registration & permits).")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      // ===== ADMIN SIDE =====
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("ADMIN SIDE (Property Managers)")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("Overview")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("The admin side is for "), new TextRun({ text: "property managers", bold: true }), new TextRun(" to set up and manage parking permits for their buildings.")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("1. Sign Up & Create a Property")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Step 1: Go to "), new TextRun({ text: "Sign Up", bold: true }), new TextRun(" on the landing page")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Enter email and password"), new TextRun("\n")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Confirm via email link")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        children: [new TextRun("Step 2: Log in and go to "), new TextRun({ text: "Properties", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Click "), new TextRun({ text: "Create Property", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Fill in: property name, address, timezone")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• You become the owner (super_admin)")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("2. Add Units (Apartments/Parking Spaces)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Go to "), new TextRun({ text: "Units", bold: true }), new TextRun(" tab")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Click "), new TextRun({ text: "Create Unit", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Enter: unit label (e.g., "), new TextRun({ text: "101", italic: true }), new TextRun(", "), new TextRun({ text: "Suite A", italic: true }), new TextRun("), building, floor, max vehicles")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Each unit can have a "), new TextRun({ text: "unit claim code", bold: true }), new TextRun(" for residents to self-signup")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("3. Register Vehicles")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Go to "), new TextRun({ text: "Vehicles", bold: true }), new TextRun(" tab")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Click "), new TextRun({ text: "Add Vehicle", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Enter: license plate, state, make, model, color, year")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Optionally assign to a resident (owner_user_id)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Mark as active/inactive")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("4. Create Permits")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Go to "), new TextRun({ text: "Permits", bold: true }), new TextRun(" tab")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Click "), new TextRun({ text: "Create Permit", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Choose: "), new TextRun({ text: "Resident", bold: true }), new TextRun(" (owned by unit member) OR "), new TextRun({ text: "Visitor", bold: true }), new TextRun(" (temporary)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Select vehicle, unit, validity dates")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• System auto-generates a QR code for parking validation")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Active permits → residents can park / visitors can scan QR")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("5. Enforcement")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Go to "), new TextRun({ text: "Enforcement", bold: true }), new TextRun(" tab")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Export list of valid license plates as CSV (for parking meters)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Use phone camera to scan QR codes and verify permit status")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• (Future: full QR scanner UI + enforcement dashboard)")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      // ===== RESIDENT SIDE =====
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("RESIDENT SIDE (Vehicle Owners)")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("Current State")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("⚠️ "), new TextRun({ text: "The resident portal is partially built. Right now, a resident's actions are:", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("1. Get invited to a property by the admin")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("2. Log in and view their assigned unit")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("3. View permits associated with their unit")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("4. See the QR code for parking validation")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("How to Test as a Resident")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Step 1: "), new TextRun({ text: "Create a second user account", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Go to Sign Up on the landing page")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Use a different email (e.g., resident@example.com)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Confirm email link")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        children: [new TextRun("Step 2: "), new TextRun({ text: "Add the resident to your property", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• (Currently NOT in the UI — database support exists)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Admin would run a database migration to add the user to property_members with role="), new TextRun({ text: "resident", italic: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• OR: Admin creates a unit claim code, resident signs up with it (not yet UI-implemented)")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        children: [new TextRun("Step 3: "), new TextRun({ text: "Log in as the resident", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Use the resident email/password")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• Go to "), new TextRun({ text: "Properties", bold: true }), new TextRun(" — they'll see your property")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• They can view units they're members of, permits, and QR codes")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      // ===== WORKFLOW EXAMPLE =====
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Example Workflow")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("Admin Setup")]
+      }),
+
+      new Table({
+        width: { size: 9360, type: WidthType.DXA },
+        columnWidths: [4680, 4680],
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                borders,
+                width: { size: 4680, type: WidthType.DXA },
+                shading: { fill: "D5E8F0", type: ShadingType.CLEAR },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: "Action", bold: true })] })]
+              }),
+              new TableCell({
+                borders,
+                width: { size: 4680, type: WidthType.DXA },
+                shading: { fill: "D5E8F0", type: ShadingType.CLEAR },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: "Details", bold: true })] })]
+              }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Sign up as admin")] })] }),
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Email: admin@example.com")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Create property")] })] }),
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Riverside Apartments")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Create units")] })] }),
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Unit 101, 102, 103 (3 units)")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Register vehicles")] })] }),
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("ABC123 (Tesla), XYZ789 (Honda)")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Create permits")] })] }),
+              new TableCell({ borders, width: { size: 4680, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Resident permit (ABC123 → Unit 101), Visitor permit (XYZ789, 1 day)")] })] }),
+            ]
+          }),
+        ]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("Resident Experience (Currently Limited)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("1. Resident signs up: resident@example.com")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("2. Admin adds them to Unit 101 (database-level, not UI)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("3. Resident logs in → sees "), new TextRun({ text: "Riverside Apartments", bold: true })]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("4. Resident views Unit 101 → sees their resident permit")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("5. Resident taps on permit → sees QR code (for gate entry / validation)")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      // ===== WHAT'S MISSING =====
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("What's Missing (Not Yet Built)")] }),
+
+      new Table({
+        width: { size: 9360, type: WidthType.DXA },
+        columnWidths: [2340, 7020],
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                borders,
+                width: { size: 2340, type: WidthType.DXA },
+                shading: { fill: "FFF2CC", type: ShadingType.CLEAR },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: "Feature", bold: true })] })]
+              }),
+              new TableCell({
+                borders,
+                width: { size: 7020, type: WidthType.DXA },
+                shading: { fill: "FFF2CC", type: ShadingType.CLEAR },
+                margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun({ text: "Impact", bold: true })] })]
+              }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Resident self-signup")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Residents get an invite code to claim their unit without admin manual setup")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Resident portal")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Dashboard showing units, vehicles, permits, QR codes")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Resident vehicle mgmt")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Residents can register/edit their own vehicles (not admin-only)")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Visitor mgmt UI")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Residents can add/revoke guest vehicle permits (currently admin-only)")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("QR scanner UI")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Enforcement staff can scan permits with phone camera (currently placeholder)")] })] }),
+            ]
+          }),
+          new TableRow({
+            children: [
+              new TableCell({ borders, width: { size: 2340, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Scan analytics")] })] }),
+              new TableCell({ borders, width: { size: 7020, type: WidthType.DXA }, margins: { top: 80, bottom: 80, left: 120, right: 120 },
+                children: [new Paragraph({ children: [new TextRun("Dashboard showing permit scans, invalid entries, audit trail")] })] }),
+            ]
+          }),
+        ]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      // ===== NEXT STEPS =====
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun("Next Steps")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("To Build Resident Features")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("Priority order:")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("1. "), new TextRun({ text: "Resident self-signup page", bold: true }), new TextRun(" — Let residents claim units with invite codes")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("2. "), new TextRun({ text: "Resident dashboard", bold: true }), new TextRun(" — Show their units, vehicles, and permits")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("3. "), new TextRun({ text: "QR scanner UI", bold: true }), new TextRun(" — Mobile-friendly permit validation")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("4. "), new TextRun({ text: "Scan analytics", bold: true }), new TextRun(" — View parking activity by permit/vehicle")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        heading: HeadingLevel.HEADING_2,
+        children: [new TextRun("Current Database Support")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("The database is "), new TextRun({ text: "already set up", bold: true }), new TextRun(" for residents:")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• "), new TextRun({ text: "unit_members", bold: true }), new TextRun(" table — tracks which users belong to which units")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• "), new TextRun({ text: "unit_claim_codes", bold: true }), new TextRun(" table — invite codes for unit signup")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• "), new TextRun({ text: "property_members", bold: true }), new TextRun(" table — tracks user roles (resident, staff, admin)")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• "), new TextRun({ text: "scan_events", bold: true }), new TextRun(" table — audit trail of every QR validation")]
+      }),
+
+      new Paragraph({
+        children: [new TextRun("• RLS policies — automatically restrict residents to their own units/vehicles")]
+      }),
+
+      new Paragraph({ children: [new TextRun("")] }),
+
+      new Paragraph({
+        children: [new TextRun("The "), new TextRun({ text: "API/auth layer", bold: true }), new TextRun(" is ready — just need to build the UI pages!")]
+      }),
+    ]
+  }]
+});
+
+Packer.toBuffer(doc).then(buffer => {
+  fs.writeFileSync("/sessions/confident-magical-clarke/mnt/parkingsystem/ADMIN_RESIDENT_GUIDE.docx", buffer);
+  console.log("Document created");
+});
