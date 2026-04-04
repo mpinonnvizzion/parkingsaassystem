@@ -123,7 +123,7 @@ export default function UnitsPage() {
     setCodeError("");
     setCodeSaving(true);
     try {
-      const { error } = await supabase.rpc("set_unit_claim_code", {
+      const { error } = await supabase.rpc("admin_set_unit_claim_code", {
         p_property_id: propertyId,
         p_unit_label: claimCodeUnit.unit_label,
         p_code: newCode.trim(),

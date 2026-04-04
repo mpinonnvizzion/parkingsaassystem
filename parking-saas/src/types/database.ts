@@ -651,6 +651,10 @@ export type Database = {
         Args: { p_code: string; p_property_id: string; p_unit_label: string }
         Returns: undefined
       }
+      admin_set_unit_claim_code: {
+        Args: { p_property_id: string; p_unit_label: string; p_code: string }
+        Returns: boolean
+      }
       claim_unit: {
         Args: { p_code: string }
         Returns: Json
