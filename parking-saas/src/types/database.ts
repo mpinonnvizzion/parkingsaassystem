@@ -475,6 +475,7 @@ export type Database = {
       units: {
         Row: {
           building: string | null
+          claim_code_hash: string | null
           created_at: string
           floor: number | null
           id: string
@@ -486,6 +487,7 @@ export type Database = {
         }
         Insert: {
           building?: string | null
+          claim_code_hash?: string | null
           created_at?: string
           floor?: number | null
           id?: string
@@ -497,6 +499,7 @@ export type Database = {
         }
         Update: {
           building?: string | null
+          claim_code_hash?: string | null
           created_at?: string
           floor?: number | null
           id?: string
