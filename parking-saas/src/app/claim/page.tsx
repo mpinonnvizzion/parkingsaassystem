@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -17,15 +17,23 @@ export default function ClaimPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
+  // If already signed in, skip straight to the claim step
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setStep("claim");
+    });
+  }, []);
+
   async function handleAuth(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setIsLoading(true);
     try {
       if (authMode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const redirectTo = `${window.location.origin}/api/auth/callback?next=/claim`;
+        const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
         if (error) throw error;
-        setSuccessMessage("Check your email to confirm your account, then come back and enter your invite code.");
+        setSuccessMessage("Check your email to confirm your account. After clicking the link you'll be brought back here automatically.");
         setStep("claim");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });

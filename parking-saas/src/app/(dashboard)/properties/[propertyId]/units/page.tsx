@@ -30,6 +30,7 @@ export default function UnitsPage() {
   const [newCode, setNewCode] = useState("");
   const [codeSaving, setCodeSaving] = useState(false);
   const [codeError, setCodeError] = useState("");
+  const [codeSuccess, setCodeSuccess] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
 
   const supabase = createClient();
@@ -77,6 +78,7 @@ export default function UnitsPage() {
     setClaimCodeUnit(unit);
     setNewCode("");
     setCodeError("");
+    setCodeSuccess(false);
     setCodeCopied(false);
   }
 
@@ -130,6 +132,7 @@ export default function UnitsPage() {
         .eq("unit_label", claimCodeUnit.unit_label);
       if (error) throw error;
       if (count === 0) throw new Error("Update failed: no matching unit found. You may not have permission to edit this unit.");
+      setCodeSuccess(true);
       setCodeCopied(false);
       await loadUnits();
     } catch (err: unknown) {
@@ -181,6 +184,7 @@ export default function UnitsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Building</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Floor</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Max Vehicles</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Invite Code</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
               </tr>
             </thead>
@@ -191,6 +195,15 @@ export default function UnitsPage() {
                   <td className="px-4 py-3 text-gray-500">{unit.building ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.floor ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.max_vehicles}</td>
+                  <td className="px-4 py-3">
+                    {unit.claim_code_hash ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-mono bg-green-50 text-green-700 border border-green-200 rounded px-2 py-0.5">
+                        {unit.claim_code_hash}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <button
@@ -314,6 +327,12 @@ export default function UnitsPage() {
           {codeError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
               {codeError}
+            </div>
+          )}
+
+          {codeSuccess && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-medium">
+              ✓ Invite code saved! Share it with your resident along with the claim link.
             </div>
           )}
 
