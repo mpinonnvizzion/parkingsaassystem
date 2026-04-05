@@ -1,17 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProperty } from "@/contexts/property-context";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/modal";
 
-export default function PropertiesPage() {
+function PropertiesPageInner() {
   const { memberships, isLoading, setPropertyId } = useProperty();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Auto-open create modal when ?new=1 is in the URL (e.g. from topbar button)
+  useEffect(() => {
+    if (searchParams.get("new") === "1") {
+      setIsModalOpen(true);
+      // Clean up the URL param without a page reload
+      router.replace("/properties");
+    }
+  }, [searchParams]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
@@ -241,5 +251,15 @@ export default function PropertiesPage() {
         {modalContent}
       </Modal>
     </>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function PropertiesPage() {
+  return (
+    <Suspense>
+      <PropertiesPageInner />
+    </Suspense>
   );
 }
