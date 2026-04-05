@@ -123,12 +123,13 @@ export default function UnitsPage() {
     setCodeError("");
     setCodeSaving(true);
     try {
-      const { error } = await supabase
+      const { error, count } = await supabase
         .from("units")
-        .update({ claim_code_hash: newCode.trim() })
+        .update({ claim_code_hash: newCode.trim() }, { count: "exact" })
         .eq("property_id", propertyId)
         .eq("unit_label", claimCodeUnit.unit_label);
       if (error) throw error;
+      if (count === 0) throw new Error("Update failed: no matching unit found. You may not have permission to edit this unit.");
       setCodeCopied(false);
       await loadUnits();
     } catch (err: unknown) {

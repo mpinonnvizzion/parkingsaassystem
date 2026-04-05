@@ -48,14 +48,19 @@ export default function ClaimPage() {
         p_code: code.trim(),
       });
       if (error) throw error;
-      const result = data as { property_id: string; unit_id: string } | null;
-      if (result?.property_id) {
+      const result = data as { success: boolean; error?: string; property_id?: string; unit_id?: string } | null;
+      if (!result?.success) {
+        setError(result?.error || "Invalid or expired invite code");
+        return;
+      }
+      if (result.property_id) {
         router.push(`/properties/${result.property_id}`);
       } else {
         router.push("/properties");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Invalid or expired invite code");
+      const msg = (err as { message?: string })?.message;
+      setError(msg || "Invalid or expired invite code");
     } finally {
       setIsLoading(false);
     }
