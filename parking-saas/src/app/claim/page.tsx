@@ -17,10 +17,10 @@ export default function ClaimPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // If already signed in, skip straight to the claim step
+  // If already signed in with a confirmed email, skip straight to the claim step
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setStep("claim");
+      if (session?.user?.email_confirmed_at) setStep("claim");
     });
   }, []);
 
