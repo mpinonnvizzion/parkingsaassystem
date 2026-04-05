@@ -123,13 +123,14 @@ export default function UnitsPage() {
     setCodeError("");
     setCodeSaving(true);
     try {
-      const { error } = await supabase.rpc("admin_set_unit_claim_code", {
-        p_property_id: propertyId,
-        p_unit_label: claimCodeUnit.unit_label,
-        p_code: newCode.trim(),
-      });
+      const { error } = await supabase
+        .from("units")
+        .update({ claim_code_hash: newCode.trim() })
+        .eq("property_id", propertyId)
+        .eq("unit_label", claimCodeUnit.unit_label);
       if (error) throw error;
       setCodeCopied(false);
+      await loadUnits();
     } catch (err: unknown) {
       setCodeError(err instanceof Error ? err.message : "Failed to set invite code");
     } finally {
