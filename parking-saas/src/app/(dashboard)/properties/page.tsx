@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProperty } from "@/contexts/property-context";
 import { createClient } from "@/lib/supabase/client";
@@ -253,8 +253,6 @@ function PropertiesPageInner() {
     </>
   );
 }
-
-import { Suspense } from "react";
 
 export default function PropertiesPage() {
   return (
