@@ -19,8 +19,8 @@ export default function ClaimPage() {
 
   // If already signed in with a confirmed email, skip straight to the claim step
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.email_confirmed_at) setStep("claim");
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user?.email_confirmed_at) setStep("claim");
     });
   }, []);
 
