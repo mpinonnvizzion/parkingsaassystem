@@ -14,6 +14,7 @@ type PropertyMembership = {
     address1: string | null;
     city: string | null;
     state: string | null;
+    settings: Record<string, string> | null;
   };
 };
 
@@ -61,7 +62,7 @@ export function PropertyProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase
         .from("property_members")
         .select(
-          "property_id, role, properties(id, name, address1, city, state)"
+          "property_id, role, properties(id, name, address1, city, state, settings)"
         )
         .eq("user_id", user!.id);
 
