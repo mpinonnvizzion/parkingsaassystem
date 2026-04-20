@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-export default function ClaimPage() {
+function ClaimPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
   const [step, setStep] = useState<"auth" | "claim">("auth");
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(searchParams.get("code") ?? "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -197,5 +198,13 @@ export default function ClaimPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function ClaimPage() {
+  return (
+    <Suspense>
+      <ClaimPageInner />
+    </Suspense>
   );
 }
