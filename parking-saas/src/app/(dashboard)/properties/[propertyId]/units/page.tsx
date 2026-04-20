@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/modal";
+import { QRCodeCanvas } from "qrcode.react";
 import type { Tables, TablesInsert } from "@/types/database";
 
 type Unit = Tables<"units">;
 type UnitInsert = TablesInsert<"units">;
 
-const CLAIM_PAGE_URL =
-  typeof window !== "undefined"
-    ? `${window.location.origin}/claim`
-    : "/claim";
+const getClaimUrl = (code?: string | null) => {
+  const base = typeof window !== "undefined" ? window.location.origin : "";
+  return code ? `${base}/claim?code=${encodeURIComponent(code)}` : `${base}/claim`;
+};
 
 export default function UnitsPage() {
   const params = useParams();
@@ -32,8 +33,19 @@ export default function UnitsPage() {
   const [codeError, setCodeError] = useState("");
   const [codeSuccess, setCodeSuccess] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const qrRef = useRef<HTMLCanvasElement>(null);
 
   const supabase = createClient();
+
+  function downloadQR(unit: Unit) {
+    const canvas = qrRef.current;
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invite-qr-unit-${unit.unit_label}.png`;
+    a.click();
+  }
 
   const [formData, setFormData] = useState<UnitInsert>({
     property_id: propertyId,
@@ -142,8 +154,9 @@ export default function UnitsPage() {
     }
   }
 
-  async function copyClaimLink() {
-    await navigator.clipboard.writeText(CLAIM_PAGE_URL);
+  async function copyClaimLink(unit?: Unit | null) {
+    const url = getClaimUrl(unit?.claim_code_hash);
+    await navigator.clipboard.writeText(url);
     setCodeCopied(true);
     setTimeout(() => setCodeCopied(false), 2000);
   }
@@ -246,7 +259,7 @@ export default function UnitsPage() {
                 Set an invite code on any unit, then share the claim link with your resident.
               </p>
               <button
-                onClick={copyClaimLink}
+                onClick={() => copyClaimLink()}
                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
               >
                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,7 +267,7 @@ export default function UnitsPage() {
                 </svg>
                 {codeCopied ? "Copied!" : "Copy claim link"}
               </button>
-              <span className="ml-2 text-xs text-blue-500 font-mono">{CLAIM_PAGE_URL}</span>
+              <span className="ml-2 text-xs text-blue-500 font-mono">{getClaimUrl()}</span>
             </div>
           </div>
         </div>
@@ -330,16 +343,41 @@ export default function UnitsPage() {
             </div>
           )}
 
-          {codeSuccess && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700 font-medium">
-              ✓ Invite code saved! Share it with your resident along with the claim link.
+          {codeSuccess && claimCodeUnit?.claim_code_hash && (
+            <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-700 font-medium mb-3">✓ Invite code saved! Share the QR code or link below with your resident.</p>
+              <div className="flex flex-col items-center gap-3">
+                <QRCodeCanvas
+                  ref={qrRef}
+                  value={getClaimUrl(claimCodeUnit.claim_code_hash)}
+                  size={180}
+                  includeMargin
+                />
+                <div className="flex gap-2 w-full">
+                  <button
+                    type="button"
+                    onClick={() => copyClaimLink(claimCodeUnit)}
+                    className="flex-1 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors"
+                  >
+                    {codeCopied ? "Copied!" : "Copy link"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => downloadQR(claimCodeUnit)}
+                    className="flex-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                  >
+                    Download QR
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 font-mono break-all text-center">{getClaimUrl(claimCodeUnit.claim_code_hash)}</p>
+              </div>
             </div>
           )}
 
           <form onSubmit={handleSetClaimCode} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                New invite code
+                {codeSuccess ? "Change invite code" : "Set invite code"}
               </label>
               <input
                 type="text"
@@ -357,23 +395,46 @@ export default function UnitsPage() {
             <div className="flex gap-3">
               <button type="button" onClick={() => setClaimCodeUnit(null)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                Cancel
+                Close
               </button>
               <button type="submit" disabled={codeSaving || !newCode.trim()}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">
-                {codeSaving ? "Saving..." : "Set code"}
+                {codeSaving ? "Saving..." : codeSuccess ? "Update code" : "Set code"}
               </button>
             </div>
           </form>
 
-          {!codeSaving && newCode === "" && (
+          {!codeSuccess && claimCodeUnit?.claim_code_hash && (
+            <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <p className="text-sm font-medium text-gray-700 mb-3">Current QR code for this unit</p>
+              <div className="flex flex-col items-center gap-3">
+                <QRCodeCanvas
+                  ref={qrRef}
+                  value={getClaimUrl(claimCodeUnit.claim_code_hash)}
+                  size={160}
+                  includeMargin
+                />
+                <div className="flex gap-2 w-full">
+                  <button type="button" onClick={() => copyClaimLink(claimCodeUnit)}
+                    className="flex-1 text-xs font-medium text-blue-700 bg-white border border-blue-300 rounded-lg px-3 py-1.5 hover:bg-blue-50 transition-colors">
+                    {codeCopied ? "Copied!" : "Copy link"}
+                  </button>
+                  <button type="button" onClick={() => downloadQR(claimCodeUnit)}
+                    className="flex-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors">
+                    Download QR
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!codeSuccess && !claimCodeUnit?.claim_code_hash && (
             <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600">
               <p className="font-medium mb-1">How it works:</p>
               <ol className="list-decimal list-inside space-y-1">
-                <li>Set a code (e.g., RIVER-101-ABCD)</li>
-                <li>Share the code + claim link with your resident</li>
-                <li>Resident visits <span className="font-mono">/claim</span>, signs up, enters the code</li>
-                <li>They are automatically added as a resident of Unit {claimCodeUnit?.unit_label}</li>
+                <li>Set a code — a QR code and link are generated automatically</li>
+                <li>Print or share the QR with your resident</li>
+                <li>Resident scans it, signs up, and is added to Unit {claimCodeUnit?.unit_label}</li>
               </ol>
             </div>
           )}

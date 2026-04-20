@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/auth-context";
+import { useProperty } from "@/contexts/property-context";
 import { Modal } from "@/components/ui/modal";
 
 type PermitRow = {
@@ -42,9 +43,11 @@ export default function PermitsPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
   const { user } = useAuth();
+  const { currentProperty } = useProperty();
   const [permits, setPermits] = useState<PermitRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [towingPermit, setTowingPermit] = useState<PermitRow | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -186,6 +189,52 @@ export default function PermitsPage() {
     revoked: "bg-red-50 text-red-700",
   };
 
+  function exportToCSV(statusFilter: "active" | "all") {
+    const rows = statusFilter === "active" ? permits.filter((p) => p.status === "active") : permits;
+    const headers = ["Plate", "Make", "Color", "Unit", "Type", "Status", "Valid From", "Valid Until", "Visitor Name", "Created"];
+    const csvRows = [
+      headers.join(","),
+      ...rows.map((p) =>
+        [
+          p.vehicles?.plate ?? "",
+          p.vehicles?.make ?? "",
+          p.vehicles?.color ?? "",
+          p.units?.unit_label ?? "",
+          p.type,
+          p.status,
+          p.valid_from ? new Date(p.valid_from).toLocaleDateString() : "",
+          p.valid_to ? new Date(p.valid_to).toLocaleDateString() : "No expiry",
+          p.visitor_name ?? "",
+          new Date(p.created_at).toLocaleDateString(),
+        ]
+          .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+          .join(",")
+      ),
+    ];
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `permits-${statusFilter}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function buildTowEmail(permit: PermitRow) {
+    const settings = (currentProperty?.settings as Record<string, string>) ?? {};
+    const towEmail = settings.towing_email ?? "";
+    const propertyName = currentProperty?.name ?? "Property";
+    const address = [currentProperty?.address1, currentProperty?.city, currentProperty?.state].filter(Boolean).join(", ");
+    const plate = permit.vehicles?.plate ?? "Unknown";
+    const make = [permit.vehicles?.make, permit.vehicles?.color].filter(Boolean).join(" ") || "Unknown vehicle";
+    const unit = permit.units?.unit_label ? `Unit ${permit.units.unit_label}` : "Unknown unit";
+    const subject = encodeURIComponent(`Tow Request — ${plate} at ${propertyName}`);
+    const body = encodeURIComponent(
+      `Tow Request\n\nProperty: ${propertyName}\nAddress: ${address}\n\nVehicle Details:\n  Plate: ${plate}\n  Description: ${make}\n  Associated Unit: ${unit}\n  Permit Status: ${permit.status}\n\nPlease tow this vehicle at your earliest convenience.\n\nRequested by: ${user?.email ?? "Property Manager"}\nDate/Time: ${new Date().toLocaleString()}`
+    );
+    return `mailto:${towEmail}?subject=${subject}&body=${body}`;
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -193,12 +242,34 @@ export default function PermitsPage() {
           <h1 className="text-xl font-bold text-gray-900">Permits</h1>
           <p className="text-sm text-gray-500 mt-1">{permits.length} permits</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          Create permit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCSV("active")}
+            className="border border-gray-300 text-gray-700 rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            title="Download active permits as CSV (opens in Excel)"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export active
+          </button>
+          <button
+            onClick={() => exportToCSV("all")}
+            className="border border-gray-300 text-gray-700 rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+            title="Download all permits as CSV"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export all
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Create permit
+          </button>
+        </div>
       </div>
 
       {/* Create Permit Modal */}
@@ -418,14 +489,22 @@ export default function PermitsPage() {
                     {p.valid_to ? new Date(p.valid_to).toLocaleDateString() : "No expiry"}
                   </td>
                   <td className="px-4 py-3">
-                    {p.status === "active" && (
+                    <div className="flex items-center gap-3">
+                      {p.status === "active" && (
+                        <button
+                          onClick={() => handleRevokePermit(p.id)}
+                          className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors"
+                        >
+                          Revoke
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleRevokePermit(p.id)}
-                        className="text-xs font-medium text-red-600 hover:text-red-700 transition-colors"
+                        onClick={() => setTowingPermit(p)}
+                        className="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors"
                       >
-                        Revoke
+                        Flag tow
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -433,6 +512,66 @@ export default function PermitsPage() {
           </table>
         </div>
       )}
+
+      {/* Towing Notification Modal */}
+      <Modal isOpen={!!towingPermit} onClose={() => setTowingPermit(null)}>
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center shrink-0">
+              <svg className="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Flag for Towing</h2>
+              <p className="text-sm text-gray-500">This will open your email client with a pre-filled tow request.</p>
+            </div>
+          </div>
+
+          {towingPermit && (
+            <div className="bg-gray-50 rounded-lg p-4 mb-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Plate</span>
+                <span className="font-mono font-medium text-gray-900">{towingPermit.vehicles?.plate ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Vehicle</span>
+                <span className="text-gray-900">{[towingPermit.vehicles?.make, towingPermit.vehicles?.color].filter(Boolean).join(" ") || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Unit</span>
+                <span className="text-gray-900">{towingPermit.units?.unit_label ?? "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Permit status</span>
+                <span className="text-gray-900 capitalize">{towingPermit.status}</span>
+              </div>
+            </div>
+          )}
+
+          {!((currentProperty?.settings as Record<string, string>)?.towing_email) && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+              No towing company email set. <a href="settings" className="underline font-medium">Configure it in Settings</a> to pre-fill the recipient.
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button onClick={() => setTowingPermit(null)}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            {towingPermit && (
+              <a
+                href={buildTowEmail(towingPermit)}
+                onClick={() => setTowingPermit(null)}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 transition-colors text-center"
+              >
+                Send tow request
+              </a>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
