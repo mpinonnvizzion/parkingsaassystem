@@ -93,7 +93,7 @@ export default function MyPermitsPage() {
       const { error } = await supabase.rpc("resident_create_permit", {
         p_property_id: propertyId,
         p_vehicle_id: selectedVehicle,
-        p_unit_id: selectedUnit || null,
+        p_unit_id: selectedUnit || undefined,
       });
       if (error) throw error;
       setModalOpen(false);
