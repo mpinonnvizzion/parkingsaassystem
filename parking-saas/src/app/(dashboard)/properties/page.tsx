@@ -9,7 +9,7 @@ import { Modal } from "@/components/ui/modal";
 function PropertiesPageInner() {
   const { memberships, isLoading, setPropertyId } = useProperty();
 
-  const canCreateProperty = memberships.length === 0 ||
+  const canCreateProperty =
     memberships.some((m) => ["super_admin", "org_admin", "property_admin"].includes(m.role));
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -195,16 +195,31 @@ function PropertiesPageInner() {
     return (
       <>
         <div className="max-w-lg mx-auto py-20 text-center">
+          <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+          </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">No properties yet</h2>
           <p className="text-sm text-gray-500 mb-6">
-            You haven&apos;t been added to any properties yet. Ask your property manager for an invite code to get started.
+            You haven&apos;t been added to any properties yet. Use the invite link your property manager sent you to get started.
           </p>
-          <button
-            onClick={handleOpenModal}
-            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          <a
+            href="/claim"
+            className="inline-block bg-blue-600 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-blue-700 transition-colors"
           >
-            Create property
-          </button>
+            Claim your unit →
+          </a>
+          {canCreateProperty && (
+            <div className="mt-4">
+              <button
+                onClick={handleOpenModal}
+                className="text-sm text-gray-400 hover:text-gray-600 underline"
+              >
+                Or create a new property
+              </button>
+            </div>
+          )}
         </div>
         <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create new property">
           {modalContent}
