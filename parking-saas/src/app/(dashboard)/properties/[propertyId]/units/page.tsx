@@ -10,6 +10,13 @@ import type { Tables, TablesInsert } from "@/types/database";
 type Unit = Tables<"units">;
 type UnitInsert = TablesInsert<"units">;
 
+type UnitWithResidents = Unit & {
+  unit_members: Array<{
+    user_id: string;
+    profiles: { full_name: string | null; email: string; phone: string | null } | null;
+  }>;
+};
+
 const getClaimUrl = (code?: string | null) => {
   const base = typeof window !== "undefined" ? window.location.origin : "";
   return code ? `${base}/claim?code=${encodeURIComponent(code)}` : `${base}/claim`;
@@ -18,7 +25,7 @@ const getClaimUrl = (code?: string | null) => {
 export default function UnitsPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
-  const [units, setUnits] = useState<Unit[]>([]);
+  const [units, setUnits] = useState<UnitWithResidents[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -65,12 +72,13 @@ export default function UnitsPage() {
     setError(null);
     const { data, error: fetchError } = await supabase
       .from("units")
-      .select("*")
+      .select("*, unit_members(user_id, profiles(full_name, email, phone))")
       .eq("property_id", propertyId)
       .order("unit_label");
 
     if (fetchError) setError(fetchError.message);
-    else if (data) setUnits(data);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    else if (data) setUnits(data as any);
     setIsLoading(false);
   }
 
@@ -197,6 +205,7 @@ export default function UnitsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Building</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Floor</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Max Vehicles</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Residents</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Invite Code</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
               </tr>
@@ -208,6 +217,24 @@ export default function UnitsPage() {
                   <td className="px-4 py-3 text-gray-500">{unit.building ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.floor ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.max_vehicles}</td>
+                  <td className="px-4 py-3">
+                    {unit.unit_members.length === 0 ? (
+                      <span className="text-xs text-gray-400">No residents</span>
+                    ) : (
+                      <div className="space-y-1">
+                        {unit.unit_members.map((m) => (
+                          <div key={m.user_id} className="text-xs">
+                            <div className="font-medium text-gray-800">{m.profiles?.full_name || m.profiles?.email || "Unknown"}</div>
+                            {m.profiles?.phone ? (
+                              <div className="text-gray-500 font-mono">{m.profiles.phone}</div>
+                            ) : (
+                              <div className="text-amber-500">No phone</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {unit.claim_code_hash ? (
                       <span className="inline-flex items-center gap-1 text-xs font-mono bg-green-50 text-green-700 border border-green-200 rounded px-2 py-0.5">

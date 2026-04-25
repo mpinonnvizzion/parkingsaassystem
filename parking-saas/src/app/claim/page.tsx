@@ -5,11 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
+type Step = "auth" | "phone" | "claim";
+
 function ClaimPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
-  const [step, setStep] = useState<"auth" | "claim">("auth");
+
+  const [step, setStep] = useState<Step>("auth");
   const [authMode, setAuthMode] = useState<"login" | "signup">("signup");
   const [code, setCode] = useState(searchParams.get("code") ?? "");
   const [email, setEmail] = useState("");
@@ -18,10 +21,36 @@ function ClaimPageInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
-  // If already signed in with a confirmed email, skip straight to the claim step
+  // Phone verification state
+  const [phone, setPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Resend countdown timer
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email_confirmed_at) setStep("claim");
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
+
+  // If already signed in, check if phone is verified too
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user?.email_confirmed_at) return;
+      // Check if phone already verified
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("phone")
+        .eq("id", user.id)
+        .single();
+      if (profile?.phone) {
+        setStep("claim");
+      } else {
+        setStep("phone");
+      }
     });
   }, []);
 
@@ -35,16 +64,75 @@ function ClaimPageInner() {
         const { error } = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirectTo } });
         if (error) throw error;
         setSuccessMessage("Check your email to confirm your account. After clicking the link you'll be brought back here automatically.");
-        setStep("claim");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        setStep("claim");
+        // Check phone verification status
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("phone")
+          .eq("id", user!.id)
+          .single();
+        if (profile?.phone) {
+          setStep("claim");
+        } else {
+          setStep("phone");
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Authentication failed");
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleSendOtp() {
+    if (!phone.trim()) {
+      setError("Please enter your phone number");
+      return;
+    }
+    setError("");
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch("/api/verify/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim() }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Failed to send code");
+      setOtpSent(true);
+      setOtpCode("");
+      setResendCooldown(60);
+      setSuccessMessage(`Verification code sent to ${phone}`);
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setIsSendingOtp(false);
+    }
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (!otpCode.trim()) return;
+    setError("");
+    setSuccessMessage("");
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch("/api/verify/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: phone.trim(), code: otpCode.trim() }),
+      });
+      const data = await res.json() as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Incorrect code");
+      setStep("claim");
+      setSuccessMessage("");
+    } catch (err: unknown) {
+      setError((err as Error).message);
+    } finally {
+      setIsVerifyingOtp(false);
     }
   }
 
@@ -75,6 +163,14 @@ function ClaimPageInner() {
     }
   }
 
+  // Step indicator config
+  const steps: { key: Step; label: string }[] = [
+    { key: "auth", label: "Sign in" },
+    { key: "phone", label: "Verify phone" },
+    { key: "claim", label: "Enter code" },
+  ];
+  const stepIndex: Record<Step, number> = { auth: 0, phone: 1, claim: 2 };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
       <div className="w-full max-w-md">
@@ -87,16 +183,23 @@ function ClaimPageInner() {
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           {/* Step indicator */}
-          <div className="flex items-center gap-3 mb-6">
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${step === "auth" ? "bg-blue-600 text-white" : "bg-green-500 text-white"}`}>
-              {step === "auth" ? "1" : "✓"}
-            </div>
-            <span className="text-sm text-gray-500">Sign in / Sign up</span>
-            <div className="flex-1 h-px bg-gray-200" />
-            <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${step === "claim" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-400"}`}>
-              2
-            </div>
-            <span className="text-sm text-gray-500">Enter code</span>
+          <div className="flex items-center gap-2 mb-6">
+            {steps.map((s, i) => {
+              const current = stepIndex[step];
+              const isDone = i < current;
+              const isActive = i === current;
+              return (
+                <div key={s.key} className="flex items-center gap-2 flex-1 last:flex-none">
+                  <div className={`flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 ${
+                    isDone ? "bg-green-500 text-white" : isActive ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-400"
+                  }`}>
+                    {isDone ? "✓" : i + 1}
+                  </div>
+                  <span className={`text-xs ${isActive ? "text-gray-700 font-medium" : "text-gray-400"}`}>{s.label}</span>
+                  {i < steps.length - 1 && <div className="flex-1 h-px bg-gray-200" />}
+                </div>
+              );
+            })}
           </div>
 
           {error && (
@@ -111,7 +214,8 @@ function ClaimPageInner() {
             </div>
           )}
 
-          {step === "auth" ? (
+          {/* Step 1: Auth */}
+          {step === "auth" && (
             <>
               <div className="flex gap-2 mb-6">
                 <button
@@ -160,7 +264,74 @@ function ClaimPageInner() {
                 </button>
               </form>
             </>
-          ) : (
+          )}
+
+          {/* Step 2: Phone verification */}
+          {step === "phone" && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-4">
+                  We need to verify your phone number. We&apos;ll send you a 6-digit code by SMS.
+                </p>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone number</label>
+                <div className="flex gap-2">
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => { setPhone(e.target.value); setOtpSent(false); setOtpCode(""); }}
+                    placeholder="+1 (555) 000-0000"
+                    disabled={otpSent && resendCooldown > 0}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSendOtp}
+                    disabled={isSendingOtp || (otpSent && resendCooldown > 0) || !phone.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  >
+                    {isSendingOtp
+                      ? "Sending..."
+                      : otpSent && resendCooldown > 0
+                      ? `Resend (${resendCooldown}s)`
+                      : otpSent
+                      ? "Resend"
+                      : "Send code"}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  US numbers: enter as 10 digits or with +1 prefix.
+                </p>
+              </div>
+
+              {otpSent && (
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Verification code</label>
+                    <input
+                      type="text"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      required
+                      placeholder="6-digit code"
+                      maxLength={6}
+                      autoFocus
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isVerifyingOtp || otpCode.length < 6}
+                    className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {isVerifyingOtp ? "Verifying..." : "Verify phone"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
+          {/* Step 3: Claim unit */}
+          {step === "claim" && (
             <form onSubmit={handleClaim} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
