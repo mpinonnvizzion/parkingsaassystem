@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { QRCodeSVG } from "qrcode.react";
+import { Modal } from "@/components/ui/modal";
 
 type MyPermit = {
   id: string;
@@ -30,6 +31,9 @@ const statusColor: Record<string, string> = {
   revoked: "bg-red-50 text-red-700 border-red-200",
 };
 
+type MyVehicle = { id: string; plate: string; make: string | null; color: string | null };
+type MyUnit = { id: string; unit_label: string };
+
 export default function MyPermitsPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
@@ -38,30 +42,147 @@ export default function MyPermitsPage() {
   const [expandedQr, setExpandedQr] = useState<string | null>(null);
   const supabase = createClient();
 
+  // Permit creation state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [myVehicles, setMyVehicles] = useState<MyVehicle[]>([]);
+  const [myUnits, setMyUnits] = useState<MyUnit[]>([]);
+  const [selectedVehicle, setSelectedVehicle] = useState("");
+  const [selectedUnit, setSelectedUnit] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+
+  async function loadPermits() {
+    const { data, error } = await supabase.rpc("get_my_permits", {
+      p_property_id: propertyId,
+    });
+    if (!error && data) setPermits(data as MyPermit[]);
+    setIsLoading(false);
+  }
+
   useEffect(() => {
-    async function loadPermits() {
-      const { data, error } = await supabase.rpc("get_my_permits", {
-        p_property_id: propertyId,
-      });
-      if (!error && data) {
-        setPermits(data as MyPermit[]);
-      }
-      setIsLoading(false);
-    }
     loadPermits();
-  }, [propertyId, supabase]);
+  }, [propertyId]);
+
+  async function openCreateModal() {
+    setCreateError("");
+    setSelectedVehicle("");
+    setSelectedUnit("");
+
+    // Load resident's own vehicles and units in parallel
+    const [{ data: vehicles }, { data: units }] = await Promise.all([
+      supabase
+        .from("vehicles")
+        .select("id, plate, make, color")
+        .eq("property_id", propertyId)
+        .eq("is_active", true),
+      supabase.rpc("get_my_units", { p_property_id: propertyId }),
+    ]);
+
+    setMyVehicles((vehicles as MyVehicle[]) ?? []);
+    setMyUnits((units as MyUnit[]) ?? []);
+    if (units && (units as MyUnit[]).length === 1) setSelectedUnit((units as MyUnit[])[0].id);
+    setModalOpen(true);
+  }
+
+  async function handleCreatePermit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedVehicle) return;
+    setCreateError("");
+    setIsCreating(true);
+    try {
+      const { error } = await supabase.rpc("resident_create_permit", {
+        p_property_id: propertyId,
+        p_vehicle_id: selectedVehicle,
+        p_unit_id: selectedUnit || null,
+      });
+      if (error) throw error;
+      setModalOpen(false);
+      setIsLoading(true);
+      await loadPermits();
+    } catch (err: unknown) {
+      setCreateError((err as { message?: string })?.message ?? "Failed to create permit");
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   const activePermits = permits.filter((p) => p.status === "active");
   const otherPermits = permits.filter((p) => p.status !== "active");
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">My Permits</h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Your active parking permits and QR codes
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">My Permits</h1>
+          <p className="text-sm text-gray-500 mt-1">Your active parking permits and QR codes</p>
+        </div>
+        <button
+          onClick={openCreateModal}
+          className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          + Get permit
+        </button>
       </div>
+
+      {/* Create permit modal */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+        <div className="bg-white rounded-lg p-6 w-full max-w-md">
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Get a parking permit</h2>
+          <p className="text-sm text-gray-500 mb-4">Select the vehicle you want to register for parking.</p>
+          {createError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
+          )}
+          <form onSubmit={handleCreatePermit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle <span className="text-red-500">*</span></label>
+              {myVehicles.length === 0 ? (
+                <p className="text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+                  No vehicles registered. Go to <strong>Vehicles</strong> to add one first.
+                </p>
+              ) : (
+                <select
+                  value={selectedVehicle}
+                  onChange={(e) => setSelectedVehicle(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select a vehicle</option>
+                  {myVehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.plate}{v.color || v.make ? ` — ${[v.color, v.make].filter(Boolean).join(" ")}` : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            {myUnits.length > 1 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                <select
+                  value={selectedUnit}
+                  onChange={(e) => setSelectedUnit(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select unit</option>
+                  {myUnits.map((u) => (
+                    <option key={u.id} value={u.id}>Unit {u.unit_label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={() => setModalOpen(false)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="submit" disabled={isCreating || !selectedVehicle || myVehicles.length === 0}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                {isCreating ? "Creating..." : "Get permit"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </Modal>
 
       {isLoading ? (
         <p className="text-sm text-gray-500">Loading...</p>
@@ -72,10 +193,8 @@ export default function MyPermitsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </div>
-          <p className="text-gray-600 font-medium">No permits found</p>
-          <p className="text-sm text-gray-400 mt-1">
-            Ask your property manager to create a permit for your vehicle.
-          </p>
+          <p className="text-gray-600 font-medium">No permits yet</p>
+          <p className="text-sm text-gray-400 mt-1">Click <strong>Get permit</strong> above to register your vehicle for parking.</p>
         </div>
       ) : (
         <div className="space-y-6">
