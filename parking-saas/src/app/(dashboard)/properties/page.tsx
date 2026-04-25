@@ -8,6 +8,9 @@ import { Modal } from "@/components/ui/modal";
 
 function PropertiesPageInner() {
   const { memberships, isLoading, setPropertyId } = useProperty();
+
+  const canCreateProperty = memberships.length === 0 ||
+    memberships.some((m) => ["super_admin", "org_admin", "property_admin"].includes(m.role));
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
@@ -194,8 +197,7 @@ function PropertiesPageInner() {
         <div className="max-w-lg mx-auto py-20 text-center">
           <h2 className="text-xl font-bold text-gray-900 mb-2">No properties yet</h2>
           <p className="text-sm text-gray-500 mb-6">
-            You haven&apos;t been added to any properties. Ask your property manager
-            for an invite, or create a new property to get started.
+            You haven&apos;t been added to any properties yet. Ask your property manager for an invite code to get started.
           </p>
           <button
             onClick={handleOpenModal}
@@ -216,12 +218,14 @@ function PropertiesPageInner() {
       <div className="max-w-2xl mx-auto py-10">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-900">Your properties</h1>
-          <button
-            onClick={handleOpenModal}
-            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            Create property
-          </button>
+          {canCreateProperty && (
+            <button
+              onClick={handleOpenModal}
+              className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              Create property
+            </button>
+          )}
         </div>
         <div className="space-y-3">
           {memberships.map((m) => (
