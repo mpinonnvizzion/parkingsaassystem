@@ -666,6 +666,14 @@ export type Database = {
         Args: { p_property_id: string }
         Returns: Json
       }
+      get_my_units: {
+        Args: { p_property_id: string }
+        Returns: { id: string; unit_label: string }[]
+      }
+      resident_create_permit: {
+        Args: { p_property_id: string; p_vehicle_id: string; p_unit_id?: string }
+        Returns: string
+      }
       get_unit_claim_codes: {
         Args: { p_property_id: string }
         Returns: Json
