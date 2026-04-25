@@ -70,15 +70,49 @@ export default function UnitsPage() {
   async function loadUnits() {
     setIsLoading(true);
     setError(null);
-    const { data, error: fetchError } = await supabase
+
+    // Step 1: fetch units
+    const { data: unitsData, error: fetchError } = await supabase
       .from("units")
-      .select("*, unit_members(user_id, profiles(full_name, email, phone))")
+      .select("*")
       .eq("property_id", propertyId)
       .order("unit_label");
 
-    if (fetchError) setError(fetchError.message);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    else if (data) setUnits(data as any);
+    if (fetchError) {
+      setError(fetchError.message);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!unitsData) {
+      setUnits([]);
+      setIsLoading(false);
+      return;
+    }
+
+    // Step 2: fetch unit_members for all units in this property
+    const unitIds = unitsData.map((u) => u.id);
+    const { data: membersData } = await supabase
+      .from("unit_members")
+      .select("unit_id, user_id")
+      .in("unit_id", unitIds.length > 0 ? unitIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    // Step 3: fetch profiles for those user_ids
+    const userIds = (membersData ?? []).map((m) => m.user_id);
+    const { data: profilesData } = userIds.length > 0
+      ? await supabase.from("profiles").select("id, full_name, email, phone").in("id", userIds)
+      : { data: [] };
+
+    // Step 4: assemble
+    const profileMap = Object.fromEntries((profilesData ?? []).map((p) => [p.id, p]));
+    const assembled: UnitWithResidents[] = unitsData.map((unit) => ({
+      ...unit,
+      unit_members: (membersData ?? [])
+        .filter((m) => m.unit_id === unit.id)
+        .map((m) => ({ user_id: m.user_id, profiles: profileMap[m.user_id] ?? null })),
+    }));
+
+    setUnits(assembled);
     setIsLoading(false);
   }
 
