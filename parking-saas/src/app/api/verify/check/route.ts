@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     // Check OTP via Twilio Verify
     const credentials = Buffer.from(`${ACCOUNT_SID}:${AUTH_TOKEN}`).toString("base64");
     const res = await fetch(
-      `https://verify.twilio.com/v2/Services/${VERIFY_SID}/VerificationChecks`,
+      `https://verify.twilio.com/v2/Services/${VERIFY_SID}/VerificationCheck`,
       {
         method: "POST",
         headers: {
@@ -35,6 +35,11 @@ export async function POST(req: NextRequest) {
     const data = await res.json() as { status?: string; valid?: boolean; message?: string };
 
     if (res.status === 404) {
+      console.error("[verify/check] Twilio verification check not found", {
+        status: res.status,
+        message: data.message,
+      });
+
       return NextResponse.json(
         { error: "Code expired or not found. Please tap 'Resend code' to get a new one." },
         { status: 400 }
@@ -42,6 +47,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (!res.ok || data.status !== "approved") {
+      console.error("[verify/check] Twilio verification check failed", {
+        status: res.status,
+        verificationStatus: data.status,
+        message: data.message,
+      });
+
       return NextResponse.json(
         { error: data.message ?? "Incorrect code. Please try again." },
         { status: 400 }
