@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
 
     if (res.status === 404) {
       return NextResponse.json(
-        { error: "This code has expired. Please tap 'Resend code' to get a new one." },
+        { error: `DEBUG — code expired/not found. Phone sent to Twilio: "${normalized}" (raw: "${phone}")` },
         { status: 400 }
       );
     }
