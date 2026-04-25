@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
 
     if (res.status === 404) {
       return NextResponse.json(
-        { error: "Code not found or expired. A new code has been sent to your phone." },
-        { status: 404 }
+        { error: "Code expired or not found. Please tap 'Resend code' to get a new one." },
+        { status: 400 }
       );
     }
 

@@ -75,10 +75,6 @@ function ClaimPageInner() {
       const savedPhone = sessionStorage.getItem("claim_pending_phone");
       if (savedPhone) {
         setStep("otp");
-        // Auto-resend a fresh OTP — the previous one may have expired during email confirmation
-        sendOtp(savedPhone).then((sent) => {
-          if (sent) setResendCooldown(60);
-        });
         return;
       }
 
@@ -177,16 +173,6 @@ function ClaimPageInner() {
         body: JSON.stringify({ phone: pendingPhone, code: otpCode.trim(), userId: pendingUserId }),
       });
       const data = await res.json() as { error?: string };
-      if (res.status === 404) {
-        // Verification expired — auto-resend a fresh code
-        setOtpCode("");
-        const sent = await sendOtp(pendingPhone);
-        if (sent) {
-          setResendCooldown(60);
-          setError("Your code expired. A new code has been sent — check your messages.");
-        }
-        return;
-      }
       if (!res.ok) throw new Error(data.error ?? "Incorrect code. Please try again.");
       setStep("claim");
     } catch (err: unknown) {
@@ -197,14 +183,10 @@ function ClaimPageInner() {
   }
 
   async function handleResendOtp() {
-    if (resendCooldown > 0) return;
     setError("");
+    setOtpCode("");
     const sent = await sendOtp(pendingPhone);
-    if (sent) {
-      setOtpCode("");
-      setResendCooldown(60);
-      setError("");
-    }
+    if (sent) setResendCooldown(60);
   }
 
   async function handleClaim(e: React.FormEvent) {
@@ -272,14 +254,6 @@ function ClaimPageInner() {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 mb-4">
               {error}
-              {step === "otp" && error.toLowerCase().includes("expired") && (
-                <button
-                  onClick={handleResendOtp}
-                  className="block mt-1 font-medium underline hover:no-underline"
-                >
-                  Tap here to send a new code
-                </button>
-              )}
             </div>
           )}
 
