@@ -10,6 +10,10 @@ import { useProperty } from "@/contexts/property-context";
 export function Topbar() {
   const { user } = useAuth();
   const { memberships, propertyId, setPropertyId } = useProperty();
+
+  const isAdminSomewhere = memberships.some((m) =>
+    ["super_admin", "org_admin", "property_admin", "staff"].includes(m.role)
+  );
   const router = useRouter();
   const supabase = createClient();
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -70,15 +74,17 @@ export function Topbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <Link
-          href="/properties?new=1"
-          className="flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>
-          New property
-        </Link>
+        {(isPlatformAdmin || isAdminSomewhere) && (
+          <Link
+            href="/properties?new=1"
+            className="flex items-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            New property
+          </Link>
+        )}
         {isPlatformAdmin && (
           <Link
             href="/admin/invites"
