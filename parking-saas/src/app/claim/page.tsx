@@ -87,19 +87,14 @@ function ClaimPageInner() {
   function normalizePhone(raw: string) {
     const digits = raw.replace(/\D/g, "");
     if (raw.startsWith("+")) return `+${digits}`;
-    // Assume US if 10 digits
     return digits.length === 10 ? `+1${digits}` : `+${digits}`;
   }
 
   async function sendOtp(phoneNumber: string): Promise<boolean> {
-    const res = await fetch("/api/verify/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: phoneNumber }),
-    });
-    const data = await res.json() as { error?: string };
-    if (!res.ok) {
-      setError(data.error ?? "Failed to send verification code");
+    // Use Supabase built-in phone OTP (routes through the Twilio SMS integration configured in Supabase)
+    const { error } = await supabase.auth.updateUser({ phone: phoneNumber });
+    if (error) {
+      setError(error.message);
       return false;
     }
     return true;
@@ -114,16 +109,11 @@ function ClaimPageInner() {
         if (!phone.trim()) throw new Error("Phone number is required");
         const normalized = normalizePhone(phone.trim());
 
-        // 1. Create the account
-        const redirectTo = `${window.location.origin}/api/auth/callback?next=/claim`;
-        const { data: signupData, error: signupError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { emailRedirectTo: redirectTo },
-        });
+        // 1. Create the account (no email redirect needed — phone OTP is the verification)
+        const { data: signupData, error: signupError } = await supabase.auth.signUp({ email, password });
         if (signupError) throw signupError;
 
-        // 2. Send OTP immediately
+        // 2. Send phone OTP via Supabase
         const sent = await sendOtp(normalized);
         if (!sent) return;
 
@@ -146,12 +136,10 @@ function ClaimPageInner() {
         if (profile?.phone) {
           setStep("claim");
         } else {
-          // Logged in but no phone yet — show phone verification
+          // Logged in but no phone — collect and verify phone
           setPendingUserId(user!.id);
-          setError("");
-          // Re-show auth with phone field so they can provide their number
           setAuthMode("signup");
-          setError("Your account doesn't have a verified phone. Please enter your phone number to continue.");
+          setError("Please add a phone number to continue.");
         }
       }
     } catch (err: unknown) {
@@ -167,16 +155,23 @@ function ClaimPageInner() {
     setError("");
     setIsLoading(true);
     try {
-      const res = await fetch("/api/verify/check", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: pendingPhone, code: otpCode.trim(), userId: pendingUserId }),
+      // Verify via Supabase phone OTP
+      const { error } = await supabase.auth.verifyOtp({
+        phone: pendingPhone,
+        token: otpCode.trim(),
+        type: "phone_change",
       });
-      const data = await res.json() as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Incorrect code. Please try again.");
+      if (error) throw error;
+
+      // Save phone to profiles table as well
+      if (pendingUserId) {
+        await supabase.from("profiles").update({ phone: pendingPhone }).eq("id", pendingUserId);
+      }
+
+      clearPending();
       setStep("claim");
     } catch (err: unknown) {
-      setError((err as Error).message);
+      setError((err as Error).message ?? "Incorrect code. Please try again.");
     } finally {
       setIsLoading(false);
     }
