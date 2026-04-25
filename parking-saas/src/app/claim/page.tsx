@@ -20,6 +20,7 @@ function ClaimPageInner() {
   const [phone, setPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [pendingPhone, setPendingPhone] = useState(""); // phone we sent OTP to
+  const [pendingUserId, setPendingUserId] = useState(""); // user id to update profile after verify
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -77,7 +78,7 @@ function ClaimPageInner() {
 
         // 1. Create the account
         const redirectTo = `${window.location.origin}/api/auth/callback?next=/claim`;
-        const { error: signupError } = await supabase.auth.signUp({
+        const { data: signupData, error: signupError } = await supabase.auth.signUp({
           email,
           password,
           options: { emailRedirectTo: redirectTo },
@@ -89,6 +90,7 @@ function ClaimPageInner() {
         if (!sent) return;
 
         setPendingPhone(normalized);
+        setPendingUserId(signupData.user?.id ?? "");
         setResendCooldown(60);
         setStep("otp");
       } else {
@@ -106,10 +108,12 @@ function ClaimPageInner() {
         if (profile?.phone) {
           setStep("claim");
         } else {
-          // Logged in but no phone yet — ask for it
-          setStep("auth");
-          setAuthMode("signup"); // reuse the form but show phone input
-          setError("Please complete phone verification to continue.");
+          // Logged in but no phone yet — show phone verification
+          setPendingUserId(user!.id);
+          setError("");
+          // Re-show auth with phone field so they can provide their number
+          setAuthMode("signup");
+          setError("Your account doesn't have a verified phone. Please enter your phone number to continue.");
         }
       }
     } catch (err: unknown) {
@@ -128,7 +132,7 @@ function ClaimPageInner() {
       const res = await fetch("/api/verify/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: pendingPhone, code: otpCode.trim() }),
+        body: JSON.stringify({ phone: pendingPhone, code: otpCode.trim(), userId: pendingUserId }),
       });
       const data = await res.json() as { error?: string };
       if (!res.ok) throw new Error(data.error ?? "Incorrect code. Please try again.");
