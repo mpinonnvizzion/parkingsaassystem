@@ -19,11 +19,33 @@ function ClaimPageInner() {
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [otpCode, setOtpCode] = useState("");
-  const [pendingPhone, setPendingPhone] = useState(""); // phone we sent OTP to
-  const [pendingUserId, setPendingUserId] = useState(""); // user id to update profile after verify
+  // Persist pendingPhone + pendingUserId in sessionStorage so page refresh doesn't lose them
+  const [pendingPhone, setPendingPhoneState] = useState(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem("claim_pending_phone") ?? "" : ""
+  );
+  const [pendingUserId, setPendingUserIdState] = useState(() =>
+    typeof window !== "undefined" ? sessionStorage.getItem("claim_pending_user_id") ?? "" : ""
+  );
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  function setPendingPhone(val: string) {
+    setPendingPhoneState(val);
+    if (typeof window !== "undefined") sessionStorage.setItem("claim_pending_phone", val);
+  }
+  function setPendingUserId(val: string) {
+    setPendingUserIdState(val);
+    if (typeof window !== "undefined") sessionStorage.setItem("claim_pending_user_id", val);
+  }
+  function clearPending() {
+    setPendingPhoneState("");
+    setPendingUserIdState("");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("claim_pending_phone");
+      sessionStorage.removeItem("claim_pending_user_id");
+    }
+  }
 
   // Countdown for resend button
   useEffect(() => {
@@ -32,16 +54,32 @@ function ClaimPageInner() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  // If already logged in, check if phone is verified
+  // On load: if there's a pending phone in sessionStorage and user is logged in but not phone-verified,
+  // jump straight to the OTP step so they can complete verification after a refresh.
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user?.email_confirmed_at) return;
+      if (!user) return;
       const { data: profile } = await supabase
         .from("profiles")
         .select("phone")
         .eq("id", user.id)
         .single();
-      setStep(profile?.phone ? "claim" : "auth");
+
+      if (profile?.phone) {
+        clearPending();
+        setStep("claim");
+        return;
+      }
+
+      // Phone not verified yet — resume OTP step if we have a pending phone
+      const savedPhone = sessionStorage.getItem("claim_pending_phone");
+      if (savedPhone) {
+        setStep("otp");
+        return;
+      }
+
+      // No pending phone — back to auth
+      if (user.email_confirmed_at) setStep("auth");
     });
   }, []);
 
@@ -166,6 +204,7 @@ function ClaimPageInner() {
         setError(result?.error || "Invalid or expired invite code");
         return;
       }
+      clearPending();
       router.push(result.property_id ? `/properties/${result.property_id}` : "/properties");
     } catch (err: unknown) {
       setError((err as { message?: string })?.message || "Invalid or expired invite code");
