@@ -38,7 +38,15 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    const data = await res.json() as { status?: string; valid?: boolean; message?: string };
+    const data = await res.json() as { status?: string; valid?: boolean; message?: string; code?: number };
+
+    if (res.status === 404) {
+      // Verification expired or already consumed — user must request a new code
+      return NextResponse.json(
+        { error: "This code has expired. Please request a new one." },
+        { status: 400 }
+      );
+    }
 
     if (!res.ok || data.status !== "approved") {
       return NextResponse.json(

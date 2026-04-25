@@ -214,6 +214,14 @@ function ClaimPageInner() {
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700 mb-4">
               {error}
+              {step === "otp" && error.toLowerCase().includes("expired") && (
+                <button
+                  onClick={handleResendOtp}
+                  className="block mt-1 font-medium underline hover:no-underline"
+                >
+                  Tap here to send a new code
+                </button>
+              )}
             </div>
           )}
 
