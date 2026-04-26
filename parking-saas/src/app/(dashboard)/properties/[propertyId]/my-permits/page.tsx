@@ -94,7 +94,8 @@ export default function MyPermitsPage() {
     const [{ data: unitDetails }, { data: residentPerms }, { data: guestPerms }] = await Promise.all([
       supabase.from("units").select("id, max_vehicles, max_guest_vehicles").in("id", unitIds),
       supabase.from("permits").select("unit_id").in("unit_id", unitIds).eq("property_id", propertyId).eq("status", "active").eq("type", "resident"),
-      supabase.from("permits").select("unit_id").in("unit_id", unitIds).eq("property_id", propertyId).eq("status", "active").eq("type", "guest"),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase.from("permits") as any).select("unit_id").in("unit_id", unitIds).eq("property_id", propertyId).eq("status", "active").eq("type", "guest"),
     ]);
 
     const detailMap = Object.fromEntries(
