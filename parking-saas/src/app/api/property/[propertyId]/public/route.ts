@@ -6,9 +6,9 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 // registering for. No sensitive data is exposed.
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { propertyId: string } }
+  { params }: { params: Promise<{ propertyId: string }> }
 ) {
-  const { propertyId } = params;
+  const { propertyId } = await params;
 
   if (!propertyId) {
     return NextResponse.json({ error: "Missing propertyId" }, { status: 400 });
