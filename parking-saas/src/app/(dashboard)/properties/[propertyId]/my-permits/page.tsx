@@ -139,6 +139,18 @@ export default function MyPermitsPage() {
     }
   }
 
+  async function handleRevokePermit(permitId: string) {
+    if (!window.confirm("Revoke this permit? Your parking spot will no longer be valid.")) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)("resident_revoke_permit", { p_permit_id: permitId });
+      if (error) throw error;
+      await loadPermits();
+    } catch (err: unknown) {
+      alert((err as { message?: string })?.message ?? "Failed to revoke permit");
+    }
+  }
+
   // Limit enforcement: find the unit currently selected in the modal
   const selectedUnitInfo = myUnits.find((u) => u.id === selectedUnit);
   const isAtLimit =
@@ -296,6 +308,7 @@ export default function MyPermitsPage() {
                     permit={permit}
                     expandedQr={expandedQr}
                     onToggleQr={setExpandedQr}
+                    onRevoke={handleRevokePermit}
                   />
                 ))}
               </div>
@@ -330,10 +343,12 @@ function PermitCard({
   permit,
   expandedQr,
   onToggleQr,
+  onRevoke,
 }: {
   permit: MyPermit;
   expandedQr: string | null;
   onToggleQr: (id: string | null) => void;
+  onRevoke?: (id: string) => void;
 }) {
   const scanUrl = permit.qr_token
     ? `${APP_URL}/scan/${permit.qr_token}`
@@ -401,20 +416,33 @@ function PermitCard({
             </div>
           </div>
 
-          {/* QR toggle button */}
-          {scanUrl && permit.status === "active" && (
-            <button
-              onClick={() => onToggleQr(isExpanded ? null : permit.id)}
-              className="shrink-0 flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors"
-              title="Show QR code"
-            >
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                  d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
-                />
-              </svg>
-              <span className="text-xs font-medium">QR Code</span>
-            </button>
+          {/* Actions: QR toggle + revoke */}
+          {permit.status === "active" && (
+            <div className="shrink-0 flex flex-col items-center gap-2">
+              {scanUrl && (
+                <button
+                  onClick={() => onToggleQr(isExpanded ? null : permit.id)}
+                  className="flex flex-col items-center gap-1 text-blue-600 hover:text-blue-700 transition-colors"
+                  title="Show QR code"
+                >
+                  <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
+                      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                    />
+                  </svg>
+                  <span className="text-xs font-medium">QR Code</span>
+                </button>
+              )}
+              {onRevoke && (
+                <button
+                  onClick={() => onRevoke(permit.id)}
+                  className="text-xs text-red-500 hover:text-red-700 font-medium transition-colors"
+                  title="Revoke this permit"
+                >
+                  Revoke
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

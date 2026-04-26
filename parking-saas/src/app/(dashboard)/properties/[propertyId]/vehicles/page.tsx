@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/auth-context";
+import { useProperty } from "@/contexts/property-context";
 import { Modal } from "@/components/ui/modal";
 import type { Tables } from "@/types/database";
 import { ImportVehiclesModal } from "@/components/import/ImportVehiclesModal";
@@ -23,6 +24,9 @@ export default function VehiclesPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
   const { user } = useAuth();
+  const { role } = useProperty();
+  const STAFF_ROLES = ["super_admin", "org_admin", "property_admin", "staff"];
+  const isStaff = role != null && STAFF_ROLES.includes(role);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -176,29 +180,41 @@ export default function VehiclesPage() {
     }
   }
 
-  // Soft delete vehicle
+  // Delete vehicle (soft) — residents use the RPC (ownership check + auto-revoke);
+  // admins use direct update (DB trigger handles permit revocation).
   async function handleDeleteVehicle(vehicleId: string) {
-    if (!window.confirm("Are you sure you want to delete this vehicle?")) {
+    if (
+      !window.confirm(
+        "Delete this vehicle? Any active permits for this vehicle will be automatically revoked."
+      )
+    ) {
       return;
     }
 
     setDeletingId(vehicleId);
 
     try {
-      const { error } = await supabase
-        .from("vehicles")
-        .update({ is_active: false })
-        .eq("id", vehicleId)
-        .eq("property_id", propertyId);
-
-      if (error) {
-        alert("Failed to delete vehicle: " + error.message);
+      if (isStaff) {
+        // Admin path: direct update — trigger auto-revokes permits
+        const { error } = await supabase
+          .from("vehicles")
+          .update({ is_active: false })
+          .eq("id", vehicleId)
+          .eq("property_id", propertyId);
+        if (error) throw error;
       } else {
-        // Reload vehicles
-        await loadVehicles();
+        // Resident path: RPC checks ownership and revokes permits
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase.rpc as any)("resident_delete_vehicle", { p_vehicle_id: vehicleId });
+        if (error) throw error;
       }
+
+      await loadVehicles();
     } catch (err) {
-      alert("An error occurred while deleting the vehicle");
+      alert(
+        "Failed to delete vehicle: " +
+          ((err as { message?: string })?.message ?? "Unknown error")
+      );
     } finally {
       setDeletingId(null);
     }
