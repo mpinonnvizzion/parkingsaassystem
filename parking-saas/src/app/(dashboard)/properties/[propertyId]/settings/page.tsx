@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [towingPhone, setTowingPhone] = useState("");
   const [guestEnabled, setGuestEnabled] = useState(true);
   const [defaultGuestHours, setDefaultGuestHours] = useState("24");
+  const [defaultMaxGuestVehicles, setDefaultMaxGuestVehicles] = useState(2);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
@@ -51,6 +52,7 @@ export default function SettingsPage() {
       // guest_parking_enabled defaults to true if not set
       setGuestEnabled(s.guest_parking_enabled !== "false");
       setDefaultGuestHours(s.default_guest_hours ?? "24");
+      setDefaultMaxGuestVehicles(parseInt(s.default_max_guest_vehicles ?? "2", 10));
     }
   }, [currentProperty]);
 
@@ -69,6 +71,7 @@ export default function SettingsPage() {
           towing_phone: towingPhone,
           guest_parking_enabled: guestEnabled.toString(),
           default_guest_hours: defaultGuestHours,
+          default_max_guest_vehicles: defaultMaxGuestVehicles.toString(),
         },
       })
       .eq("id", currentProperty.id);
@@ -219,6 +222,25 @@ export default function SettingsPage() {
                 </select>
                 <p className="text-xs text-gray-400 mt-1">
                   Pre-fills the duration when a resident creates a guest permit. They can still adjust it.
+                </p>
+              </div>
+
+              {/* Default max guest vehicles per unit */}
+              <div className={!guestEnabled ? "opacity-40 pointer-events-none" : ""}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Default guest vehicle limit per unit
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={defaultMaxGuestVehicles}
+                  onChange={(e) => setDefaultMaxGuestVehicles(Math.max(1, parseInt(e.target.value) || 1))}
+                  disabled={!canEdit || !guestEnabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  How many active guest permits a unit can hold at once. Individual units can override this in the Units settings. Set a unit to 0 to block guests for that unit specifically.
                 </p>
               </div>
             </div>

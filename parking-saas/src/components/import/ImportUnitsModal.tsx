@@ -122,6 +122,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onComplete: () => void;
+  defaultMaxGuestVehicles?: number;
 }
 
 // ─── Template download ────────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ function downloadTemplate() {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Props) {
+export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete, defaultMaxGuestVehicles = 2 }: Props) {
   const [step, setStep] = useState<Step>("idle");
   const [rows, setRows] = useState<ParsedUnit[]>([]);
   const [parseError, setParseError] = useState("");
@@ -190,7 +191,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
         const max_guest_vehicles =
           maxGuestRaw !== "" && !isNaN(Number(maxGuestRaw)) && Number(maxGuestRaw) >= 0
             ? Math.round(Number(maxGuestRaw))
-            : 1;
+            : defaultMaxGuestVehicles;
 
         return {
           _row: i + 2,
@@ -256,6 +257,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           propertyId,
+          defaultMaxGuestVehicles,
           rows: validRows.map(({ unit_label, building, floor, max_vehicles, max_guest_vehicles }) => ({
             unit_label, building, floor, max_vehicles, max_guest_vehicles,
           })),

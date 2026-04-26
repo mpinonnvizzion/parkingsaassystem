@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useProperty } from "@/contexts/property-context";
 import { Modal } from "@/components/ui/modal";
 import { QRCodeCanvas } from "qrcode.react";
 import type { Tables, TablesInsert } from "@/types/database";
@@ -30,6 +31,12 @@ const getClaimUrl = (code?: string | null) => {
 export default function UnitsPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
+  const { currentProperty } = useProperty();
+
+  // Read the property-wide guest vehicle default from settings (falls back to 2)
+  const propertySettings = (currentProperty?.settings ?? {}) as Record<string, string>;
+  const propertyDefaultMaxGuest = parseInt(propertySettings.default_max_guest_vehicles ?? "2", 10);
+
   const [units, setUnits] = useState<UnitWithResidents[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,7 +132,7 @@ export default function UnitsPage() {
 
   function openModalForCreate() {
     setEditingUnit(null);
-    setFormData({ property_id: propertyId, unit_label: "", building: null, floor: null, max_vehicles: 2, max_guest_vehicles: 1, notes: null });
+    setFormData({ property_id: propertyId, unit_label: "", building: null, floor: null, max_vehicles: 2, max_guest_vehicles: propertyDefaultMaxGuest, notes: null });
     setModalOpen(true);
   }
 
@@ -277,7 +284,14 @@ export default function UnitsPage() {
                   <td className="px-4 py-3 text-gray-500">{unit.building ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.floor ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.max_vehicles}</td>
-                  <td className="px-4 py-3 text-gray-500">{(unit as Unit & { max_guest_vehicles?: number }).max_guest_vehicles ?? 1}</td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {(() => {
+                      const v = (unit as Unit & { max_guest_vehicles?: number }).max_guest_vehicles ?? propertyDefaultMaxGuest;
+                      if (v === 0) return <span className="text-xs text-red-500 font-medium">No guests</span>;
+                      if (v !== propertyDefaultMaxGuest) return <span className="text-amber-600 font-medium">{v} <span className="text-xs font-normal">(override)</span></span>;
+                      return v;
+                    })()}
+                  </td>
                   <td className="px-4 py-3">
                     {unit.unit_members.length === 0 ? (
                       <span className="text-xs text-gray-400">No residents</span>
@@ -399,12 +413,25 @@ export default function UnitsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Max Guest Vehicles</label>
               <input
                 type="number"
-                value={formData.max_guest_vehicles ?? 1}
-                onChange={(e) => handleInputChange("max_guest_vehicles", parseInt(e.target.value))}
+                value={formData.max_guest_vehicles ?? propertyDefaultMaxGuest}
+                onChange={(e) => handleInputChange("max_guest_vehicles", Math.max(0, parseInt(e.target.value) || 0))}
                 min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <p className="text-xs text-gray-400 mt-1">Max simultaneous active guest permits for this unit. Set to 0 to disallow guests.</p>
+              {/* Override hint */}
+              {formData.max_guest_vehicles === 0 ? (
+                <p className="text-xs text-red-500 mt-1 font-medium">
+                  Set to 0 — guests are blocked for this unit even if guest parking is enabled property-wide.
+                </p>
+              ) : formData.max_guest_vehicles !== propertyDefaultMaxGuest ? (
+                <p className="text-xs text-amber-600 mt-1">
+                  Differs from property default ({propertyDefaultMaxGuest}). This unit has a custom guest limit.
+                </p>
+              ) : (
+                <p className="text-xs text-gray-400 mt-1">
+                  Matches property default. Set to 0 to block guests for this unit specifically.
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -569,6 +596,7 @@ export default function UnitsPage() {
         isOpen={importModalOpen}
         onClose={() => setImportModalOpen(false)}
         onComplete={() => { setImportModalOpen(false); loadUnits(); }}
+        defaultMaxGuestVehicles={propertyDefaultMaxGuest}
       />
     </div>
   );

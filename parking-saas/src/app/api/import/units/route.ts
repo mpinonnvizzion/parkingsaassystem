@@ -16,8 +16,8 @@ interface SkippedRow {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json() as { propertyId?: string; rows?: UnitRow[] };
-    const { propertyId, rows } = body;
+    const body = await req.json() as { propertyId?: string; rows?: UnitRow[]; defaultMaxGuestVehicles?: number };
+    const { propertyId, rows, defaultMaxGuestVehicles = 2 } = body;
 
     if (!propertyId) {
       return NextResponse.json({ error: "propertyId is required" }, { status: 400 });
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       const maxGuestVehicles =
         row.max_guest_vehicles != null && !isNaN(Number(row.max_guest_vehicles))
           ? Math.max(0, Math.round(Number(row.max_guest_vehicles)))
-          : 1;
+          : defaultMaxGuestVehicles;
 
       const floorVal = row.floor;
       const floor =
