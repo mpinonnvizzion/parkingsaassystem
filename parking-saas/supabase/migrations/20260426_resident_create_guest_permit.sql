@@ -87,8 +87,7 @@ BEGIN
     valid_from,
     valid_to,
     visitor_name,
-    created_by,
-    qr_token
+    created_by
   ) VALUES (
     p_property_id,
     p_unit_id,
@@ -98,8 +97,7 @@ BEGIN
     now(),
     now() + (p_duration_hours || ' hours')::interval,
     nullif(trim(coalesce(p_guest_name, '')), ''),
-    auth.uid(),
-    gen_random_uuid()::text
+    auth.uid()
   )
   RETURNING id INTO v_permit_id;
 
