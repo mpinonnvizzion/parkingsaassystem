@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Modal } from "@/components/ui/modal";
 import { QRCodeCanvas } from "qrcode.react";
 import type { Tables, TablesInsert } from "@/types/database";
+import { ImportUnitsModal } from "@/components/import/ImportUnitsModal";
 
 type Unit = Tables<"units">;
 type UnitInsert = TablesInsert<"units">;
@@ -32,6 +33,7 @@ export default function UnitsPage() {
   const [editingUnit, setEditingUnit] = useState<Unit | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   // Claim code state
   const [claimCodeUnit, setClaimCodeUnit] = useState<Unit | null>(null);
@@ -216,12 +218,20 @@ export default function UnitsPage() {
           <h1 className="text-xl font-bold text-gray-900">Units</h1>
           <p className="text-sm text-gray-500 mt-1">{units.length} units</p>
         </div>
-        <button
-          onClick={openModalForCreate}
-          className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          Add unit
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="border border-gray-300 text-gray-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={openModalForCreate}
+            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Add unit
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -523,6 +533,14 @@ export default function UnitsPage() {
           </div>
         </Modal>
       )}
+
+      {/* Bulk Import Modal */}
+      <ImportUnitsModal
+        propertyId={propertyId}
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onComplete={() => { setImportModalOpen(false); loadUnits(); }}
+      />
     </div>
   );
 }

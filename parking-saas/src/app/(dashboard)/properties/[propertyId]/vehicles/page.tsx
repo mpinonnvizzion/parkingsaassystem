@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/contexts/auth-context";
 import { Modal } from "@/components/ui/modal";
 import type { Tables } from "@/types/database";
+import { ImportVehiclesModal } from "@/components/import/ImportVehiclesModal";
 
 type Vehicle = Tables<"vehicles">;
 
@@ -30,6 +31,7 @@ export default function VehiclesPage() {
   const [error, setError] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     plate: "",
@@ -211,12 +213,20 @@ export default function VehiclesPage() {
             {vehicles.length} active vehicle{vehicles.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <button
-          onClick={openRegisterModal}
-          className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          Register vehicle
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="border border-gray-300 text-gray-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={openRegisterModal}
+            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            Register vehicle
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -286,6 +296,14 @@ export default function VehiclesPage() {
           </table>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <ImportVehiclesModal
+        propertyId={propertyId}
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onComplete={() => { setImportModalOpen(false); loadVehicles(); }}
+      />
 
       {/* Modal for create/edit vehicle */}
       <Modal isOpen={showModal} onClose={() => setShowModal(false)}>
