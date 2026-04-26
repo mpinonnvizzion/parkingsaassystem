@@ -11,6 +11,8 @@ export default function SettingsPage() {
 
   const [towingEmail, setTowingEmail] = useState("");
   const [towingPhone, setTowingPhone] = useState("");
+  const [guestEnabled, setGuestEnabled] = useState(true);
+  const [defaultGuestHours, setDefaultGuestHours] = useState("24");
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [qrCopied, setQrCopied] = useState(false);
@@ -46,6 +48,9 @@ export default function SettingsPage() {
       const s = currentProperty.settings as Record<string, string>;
       setTowingEmail(s.towing_email ?? "");
       setTowingPhone(s.towing_phone ?? "");
+      // guest_parking_enabled defaults to true if not set
+      setGuestEnabled(s.guest_parking_enabled !== "false");
+      setDefaultGuestHours(s.default_guest_hours ?? "24");
     }
   }, [currentProperty]);
 
@@ -57,7 +62,15 @@ export default function SettingsPage() {
     const existing = (currentProperty.settings as Record<string, string>) ?? {};
     const { error } = await supabase
       .from("properties")
-      .update({ settings: { ...existing, towing_email: towingEmail, towing_phone: towingPhone } })
+      .update({
+        settings: {
+          ...existing,
+          towing_email: towingEmail,
+          towing_phone: towingPhone,
+          guest_parking_enabled: guestEnabled.toString(),
+          default_guest_hours: defaultGuestHours,
+        },
+      })
       .eq("id", currentProperty.id);
     setIsSaving(false);
     if (!error) setSaved(true);
@@ -153,50 +166,110 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* Towing Company */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="font-semibold text-gray-900 mb-1">Towing Company</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Used when flagging a vehicle for towing from the Permits page.
-          </p>
-          <form onSubmit={saveSettings} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Towing company email
-              </label>
-              <input
-                type="email"
-                value={towingEmail}
-                onChange={(e) => setTowingEmail(e.target.value)}
-                placeholder="dispatch@towingco.com"
-                disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-              />
+        {/* Combined settings form */}
+        <form onSubmit={saveSettings} className="space-y-6">
+          {/* Guest Parking */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h2 className="font-semibold text-gray-900 mb-1">Guest Parking</h2>
+            <p className="text-sm text-gray-500 mb-5">
+              Control whether residents can invite guests and set how long guest permits last by default.
+            </p>
+
+            <div className="space-y-5">
+              {/* Enable / disable toggle */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Allow guest parking</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    When off, residents cannot invite guests from My Permits.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={guestEnabled}
+                  disabled={!canEdit}
+                  onClick={() => setGuestEnabled((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    guestEnabled ? "bg-blue-600" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                      guestEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Default guest permit duration */}
+              <div className={!guestEnabled ? "opacity-40 pointer-events-none" : ""}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Default guest permit duration
+                </label>
+                <select
+                  value={defaultGuestHours}
+                  onChange={(e) => setDefaultGuestHours(e.target.value)}
+                  disabled={!canEdit || !guestEnabled}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="24">24 hours</option>
+                  <option value="48">48 hours</option>
+                  <option value="72">72 hours</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  Pre-fills the duration when a resident creates a guest permit. They can still adjust it.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Towing company phone
-              </label>
-              <input
-                type="tel"
-                value={towingPhone}
-                onChange={(e) => setTowingPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-              />
+          </div>
+
+          {/* Towing Company */}
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h2 className="font-semibold text-gray-900 mb-1">Towing Company</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Used when flagging a vehicle for towing from the Permits page.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Towing company email
+                </label>
+                <input
+                  type="email"
+                  value={towingEmail}
+                  onChange={(e) => setTowingEmail(e.target.value)}
+                  placeholder="dispatch@towingco.com"
+                  disabled={!canEdit}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Towing company phone
+                </label>
+                <input
+                  type="tel"
+                  value={towingPhone}
+                  onChange={(e) => setTowingPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  disabled={!canEdit}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+              </div>
             </div>
-            {canEdit && (
-              <button
-                type="submit"
-                disabled={isSaving}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {isSaving ? "Saving..." : saved ? "✓ Saved" : "Save settings"}
-              </button>
-            )}
-          </form>
-        </div>
+          </div>
+
+          {canEdit && (
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
+              {isSaving ? "Saving..." : saved ? "✓ Saved" : "Save settings"}
+            </button>
+          )}
+        </form>
       </div>
     </div>
   );

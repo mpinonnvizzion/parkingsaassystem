@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useProperty } from "@/contexts/property-context";
 import { QRCodeSVG } from "qrcode.react";
 import { Modal } from "@/components/ui/modal";
 
@@ -37,6 +38,16 @@ type MyUnit = { id: string; unit_label: string; max_vehicles: number; active_per
 export default function MyPermitsPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
+  const { currentProperty } = useProperty();
+
+  // Guest parking settings — read from property, default to enabled / 24h if not set.
+  // guestParkingEnabled gates the "Invite a guest" button (task 868jd9c5a).
+  // defaultGuestHours pre-fills the duration picker in the guest invite modal.
+  const propertySettings = (currentProperty?.settings ?? {}) as Record<string, string>;
+  const guestParkingEnabled = propertySettings.guest_parking_enabled !== "false";
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const defaultGuestHours = parseInt(propertySettings.default_guest_hours ?? "24", 10);
+
   const [permits, setPermits] = useState<MyPermit[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedQr, setExpandedQr] = useState<string | null>(null);
@@ -167,12 +178,16 @@ export default function MyPermitsPage() {
           <h1 className="text-xl font-bold text-gray-900">My Permits</h1>
           <p className="text-sm text-gray-500 mt-1">Your active parking permits and QR codes</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          + Get permit
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Invite a Guest button — rendered by task 868jd9c5a, hidden when guest parking is disabled */}
+          {guestParkingEnabled && null /* placeholder for InviteGuestButton */}
+          <button
+            onClick={openCreateModal}
+            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            + Get permit
+          </button>
+        </div>
       </div>
 
       {/* Create permit modal */}
