@@ -99,8 +99,9 @@ export default function MyPermitsPage() {
       (supabase.from("permits") as any).select("unit_id").in("unit_id", unitIds).eq("property_id", propertyId).eq("status", "active").eq("type", "guest"),
     ]);
 
+    type UnitDetail = { id: string; max_vehicles: number; max_guest_vehicles?: number };
     const detailMap = Object.fromEntries(
-      (unitDetails ?? []).map((u) => [u.id, u as { id: string; max_vehicles: number; max_guest_vehicles?: number }])
+      (unitDetails ?? []).map((u: UnitDetail) => [u.id, u])
     );
     const residentCount: Record<string, number> = {};
     for (const p of residentPerms ?? []) {
