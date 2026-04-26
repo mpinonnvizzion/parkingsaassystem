@@ -15,6 +15,18 @@ function ClaimPageInner() {
   const [step, setStep] = useState<Step>("auth");
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
   const [code, setCode] = useState(searchParams.get("code") ?? "");
+
+  // Property context from ?property= param (set when scanned from property-wide QR)
+  const propertyParam = searchParams.get("property") ?? "";
+  const [propertyInfo, setPropertyInfo] = useState<{ name: string; address: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!propertyParam) return;
+    fetch(`/api/property/${propertyParam}/public`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data?.name) setPropertyInfo(data); })
+      .catch(() => null);
+  }, [propertyParam]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
@@ -219,6 +231,23 @@ function ClaimPageInner() {
             Register as a resident to get your parking permit.
           </p>
         </div>
+
+        {/* Property context banner — shown when scanned from a property QR */}
+        {propertyInfo && (
+          <div className="mb-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <div className="shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-blue-900">{propertyInfo.name}</p>
+              {propertyInfo.address && (
+                <p className="text-xs text-blue-600 mt-0.5">{propertyInfo.address}</p>
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           {/* Step indicator */}
