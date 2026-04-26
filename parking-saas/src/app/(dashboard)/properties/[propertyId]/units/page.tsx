@@ -62,6 +62,7 @@ export default function UnitsPage() {
     building: null,
     floor: null,
     max_vehicles: 2,
+    max_guest_vehicles: 1,
     notes: null,
   });
 
@@ -120,13 +121,22 @@ export default function UnitsPage() {
 
   function openModalForCreate() {
     setEditingUnit(null);
-    setFormData({ property_id: propertyId, unit_label: "", building: null, floor: null, max_vehicles: 2, notes: null });
+    setFormData({ property_id: propertyId, unit_label: "", building: null, floor: null, max_vehicles: 2, max_guest_vehicles: 1, notes: null });
     setModalOpen(true);
   }
 
   function openModalForEdit(unit: Unit) {
     setEditingUnit(unit);
-    setFormData({ property_id: propertyId, unit_label: unit.unit_label, building: unit.building, floor: unit.floor, max_vehicles: unit.max_vehicles, notes: unit.notes });
+    setFormData({
+      property_id: propertyId,
+      unit_label: unit.unit_label,
+      building: unit.building,
+      floor: unit.floor,
+      max_vehicles: unit.max_vehicles,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      max_guest_vehicles: (unit as any).max_guest_vehicles ?? 1,
+      notes: unit.notes,
+    });
     setModalOpen(true);
   }
 
@@ -249,6 +259,7 @@ export default function UnitsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Building</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Floor</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Max Vehicles</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Max Guest</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Residents</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Invite Code</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-500">Actions</th>
@@ -261,6 +272,8 @@ export default function UnitsPage() {
                   <td className="px-4 py-3 text-gray-500">{unit.building ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.floor ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.max_vehicles}</td>
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  <td className="px-4 py-3 text-gray-500">{(unit as any).max_guest_vehicles ?? 1}</td>
                   <td className="px-4 py-3">
                     {unit.unit_members.length === 0 ? (
                       <span className="text-xs text-gray-400">No residents</span>
@@ -376,6 +389,19 @@ export default function UnitsPage() {
               <input type="number" value={formData.max_vehicles || 2} onChange={(e) => handleInputChange("max_vehicles", parseInt(e.target.value))}
                 min="1"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <p className="text-xs text-gray-400 mt-1">Max simultaneous resident permits for this unit.</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Max Guest Vehicles</label>
+              <input
+                type="number"
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                value={(formData as any).max_guest_vehicles ?? 1}
+                onChange={(e) => handleInputChange("max_guest_vehicles" as keyof UnitInsert, parseInt(e.target.value))}
+                min="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">Max simultaneous active guest permits for this unit. Set to 0 to disallow guests.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>

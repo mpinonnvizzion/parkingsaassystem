@@ -6,6 +6,7 @@ interface UnitRow {
   building?: string | null;
   floor?: number | null;
   max_vehicles?: number;
+  max_guest_vehicles?: number;
 }
 
 interface SkippedRow {
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
       building: string | null;
       floor: number | null;
       max_vehicles: number;
+      max_guest_vehicles: number;
     }[] = [];
     const skipped: SkippedRow[] = [];
 
@@ -71,6 +73,11 @@ export async function POST(req: NextRequest) {
           ? Math.max(1, Math.round(Number(row.max_vehicles)))
           : 2;
 
+      const maxGuestVehicles =
+        row.max_guest_vehicles != null && !isNaN(Number(row.max_guest_vehicles))
+          ? Math.max(0, Math.round(Number(row.max_guest_vehicles)))
+          : 1;
+
       const floorVal = row.floor;
       const floor =
         floorVal != null && !isNaN(Number(floorVal))
@@ -83,6 +90,7 @@ export async function POST(req: NextRequest) {
         building: row.building?.toString().trim() || null,
         floor,
         max_vehicles: maxVehicles,
+        max_guest_vehicles: maxGuestVehicles,
       });
     }
 

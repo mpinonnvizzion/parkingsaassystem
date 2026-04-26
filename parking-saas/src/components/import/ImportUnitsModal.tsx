@@ -84,10 +84,11 @@ async function parseFile(file: File): Promise<Record<string, string>[]> {
 
 // ─── Column normalisation ─────────────────────────────────────────────────────
 
-const UNIT_LABEL_KEYS = ["unit_label", "unit", "label", "apt", "apartment", "unit_number", "unitlabel", "unitnumber", "unit#"];
-const BUILDING_KEYS   = ["building", "bldg", "bld", "building_name"];
-const FLOOR_KEYS      = ["floor", "fl", "story", "storey"];
-const MAX_VEH_KEYS    = ["max_vehicles", "max_cars", "vehicles", "max_vehicle", "vehicle_limit", "maxvehicles", "max"];
+const UNIT_LABEL_KEYS   = ["unit_label", "unit", "label", "apt", "apartment", "unit_number", "unitlabel", "unitnumber", "unit#"];
+const BUILDING_KEYS     = ["building", "bldg", "bld", "building_name"];
+const FLOOR_KEYS        = ["floor", "fl", "story", "storey"];
+const MAX_VEH_KEYS      = ["max_vehicles", "max_cars", "vehicles", "max_vehicle", "vehicle_limit", "maxvehicles", "max"];
+const MAX_GUEST_KEYS    = ["max_guest_vehicles", "max_guests", "guest_vehicles", "guest_limit", "maxguests", "guestlimit"];
 
 function pick(row: Record<string, string>, keys: string[]): string {
   for (const k of keys) {
@@ -104,6 +105,7 @@ interface ParsedUnit {
   building: string | null;
   floor: number | null;
   max_vehicles: number;
+  max_guest_vehicles: number;
   _error?: string;
 }
 
@@ -125,7 +127,7 @@ interface Props {
 // ─── Template download ────────────────────────────────────────────────────────
 
 function downloadTemplate() {
-  const csv = "unit_label,building,floor,max_vehicles\n101,A,1,2\n102,A,1,2\n201,B,2,1\n";
+  const csv = "unit_label,building,floor,max_vehicles,max_guest_vehicles\n101,A,1,2,1\n102,A,1,2,1\n201,B,2,1,2\n";
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -175,6 +177,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
         const buildingRaw = pick(row, BUILDING_KEYS).trim();
         const floorRaw = pick(row, FLOOR_KEYS).trim();
         const maxVehRaw = pick(row, MAX_VEH_KEYS).trim();
+        const maxGuestRaw = pick(row, MAX_GUEST_KEYS).trim();
 
         let _error: string | undefined;
         if (!unit_label) _error = "Missing unit label";
@@ -184,6 +187,10 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
           maxVehRaw !== "" && !isNaN(Number(maxVehRaw)) && Number(maxVehRaw) > 0
             ? Math.round(Number(maxVehRaw))
             : 2;
+        const max_guest_vehicles =
+          maxGuestRaw !== "" && !isNaN(Number(maxGuestRaw)) && Number(maxGuestRaw) >= 0
+            ? Math.round(Number(maxGuestRaw))
+            : 1;
 
         return {
           _row: i + 2,
@@ -191,6 +198,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
           building: buildingRaw || null,
           floor,
           max_vehicles,
+          max_guest_vehicles,
           _error,
         };
       });
@@ -248,8 +256,8 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           propertyId,
-          rows: validRows.map(({ unit_label, building, floor, max_vehicles }) => ({
-            unit_label, building, floor, max_vehicles,
+          rows: validRows.map(({ unit_label, building, floor, max_vehicles, max_guest_vehicles }) => ({
+            unit_label, building, floor, max_vehicles, max_guest_vehicles,
           })),
         }),
       });
@@ -282,7 +290,8 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
               (required),{" "}
               <span className="font-mono text-xs bg-gray-100 px-1 rounded">building</span>,{" "}
               <span className="font-mono text-xs bg-gray-100 px-1 rounded">floor</span>,{" "}
-              <span className="font-mono text-xs bg-gray-100 px-1 rounded">max_vehicles</span>.
+              <span className="font-mono text-xs bg-gray-100 px-1 rounded">max_vehicles</span>,{" "}
+              <span className="font-mono text-xs bg-gray-100 px-1 rounded">max_guest_vehicles</span>.
             </p>
 
             <button
@@ -355,6 +364,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
                     <th className="text-left px-3 py-2 font-medium text-gray-500">Building</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-500">Floor</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-500">Max Vehicles</th>
+                    <th className="text-left px-3 py-2 font-medium text-gray-500">Max Guest</th>
                     <th className="text-left px-3 py-2 font-medium text-gray-500">Status</th>
                   </tr>
                 </thead>
@@ -373,6 +383,7 @@ export function ImportUnitsModal({ propertyId, isOpen, onClose, onComplete }: Pr
                       <td className="px-3 py-2 text-gray-500">{row.building ?? "—"}</td>
                       <td className="px-3 py-2 text-gray-500">{row.floor ?? "—"}</td>
                       <td className="px-3 py-2 text-gray-500">{row.max_vehicles}</td>
+                      <td className="px-3 py-2 text-gray-500">{row.max_guest_vehicles}</td>
                       <td className="px-3 py-2">
                         {row._error ? (
                           <span className="text-red-600 font-medium" title={row._error}>
