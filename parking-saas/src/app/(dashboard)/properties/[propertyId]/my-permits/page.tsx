@@ -32,7 +32,7 @@ const statusColor: Record<string, string> = {
 };
 
 type MyVehicle = { id: string; plate: string; make: string | null; color: string | null };
-type MyUnit = { id: string; unit_label: string };
+type MyUnit = { id: string; unit_label: string; max_vehicles: number; active_permits: number };
 
 export default function MyPermitsPage() {
   const params = useParams();
@@ -78,9 +78,42 @@ export default function MyPermitsPage() {
       supabase.rpc("get_my_units", { p_property_id: propertyId }),
     ]);
 
+    const unitList = (units as { id: string; unit_label: string }[]) ?? [];
+
+    // Enrich units with max_vehicles limit and current active permit count
+    if (unitList.length > 0) {
+      const unitIds = unitList.map((u) => u.id);
+      const [{ data: unitDetails }, { data: activePermits }] = await Promise.all([
+        supabase.from("units").select("id, max_vehicles").in("id", unitIds),
+        supabase
+          .from("permits")
+          .select("unit_id")
+          .in("unit_id", unitIds)
+          .eq("property_id", propertyId)
+          .eq("status", "active")
+          .eq("type", "resident"),
+      ]);
+
+      const maxMap = Object.fromEntries(
+        (unitDetails ?? []).map((u) => [u.id, u.max_vehicles as number])
+      );
+      const countMap: Record<string, number> = {};
+      for (const p of activePermits ?? []) {
+        if (p.unit_id) countMap[p.unit_id] = (countMap[p.unit_id] ?? 0) + 1;
+      }
+
+      const enriched: MyUnit[] = unitList.map((u) => ({
+        ...u,
+        max_vehicles: maxMap[u.id] ?? 2,
+        active_permits: countMap[u.id] ?? 0,
+      }));
+      setMyUnits(enriched);
+      if (enriched.length === 1) setSelectedUnit(enriched[0].id);
+    } else {
+      setMyUnits([]);
+    }
+
     setMyVehicles((vehicles as MyVehicle[]) ?? []);
-    setMyUnits((units as MyUnit[]) ?? []);
-    if (units && (units as MyUnit[]).length === 1) setSelectedUnit((units as MyUnit[])[0].id);
     setModalOpen(true);
   }
 
@@ -106,6 +139,12 @@ export default function MyPermitsPage() {
     }
   }
 
+  // Limit enforcement: find the unit currently selected in the modal
+  const selectedUnitInfo = myUnits.find((u) => u.id === selectedUnit);
+  const isAtLimit =
+    selectedUnitInfo != null &&
+    selectedUnitInfo.active_permits >= selectedUnitInfo.max_vehicles;
+
   const activePermits = permits.filter((p) => p.status === "active");
   const otherPermits = permits.filter((p) => p.status !== "active");
 
@@ -129,9 +168,24 @@ export default function MyPermitsPage() {
         <div className="bg-white rounded-lg p-6 w-full max-w-md">
           <h2 className="text-lg font-bold text-gray-900 mb-1">Get a parking permit</h2>
           <p className="text-sm text-gray-500 mb-4">Select the vehicle you want to register for parking.</p>
+
           {createError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
           )}
+
+          {/* At-limit warning */}
+          {isAtLimit && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              <p className="font-medium">Vehicle limit reached</p>
+              <p className="mt-0.5">
+                Unit {selectedUnitInfo?.unit_label} allows{" "}
+                {selectedUnitInfo?.max_vehicles} vehicle{selectedUnitInfo?.max_vehicles !== 1 ? "s" : ""} and already has{" "}
+                {selectedUnitInfo?.active_permits} active permit{selectedUnitInfo?.active_permits !== 1 ? "s" : ""}.
+                Contact your property manager to increase the limit.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleCreatePermit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle <span className="text-red-500">*</span></label>
@@ -155,6 +209,7 @@ export default function MyPermitsPage() {
                 </select>
               )}
             </div>
+
             {myUnits.length > 1 && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
@@ -165,18 +220,48 @@ export default function MyPermitsPage() {
                 >
                   <option value="">Select unit</option>
                   {myUnits.map((u) => (
-                    <option key={u.id} value={u.id}>Unit {u.unit_label}</option>
+                    <option key={u.id} value={u.id}>
+                      Unit {u.unit_label}
+                      {u.active_permits >= u.max_vehicles ? " — limit reached" : ` — ${u.active_permits}/${u.max_vehicles} permits`}
+                    </option>
                   ))}
                 </select>
               </div>
             )}
+
+            {/* Permit usage indicator (shown when a single unit or unit is selected) */}
+            {selectedUnitInfo && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5">
+                <div className="flex items-center justify-between text-xs text-gray-600 mb-1.5">
+                  <span>Unit {selectedUnitInfo.unit_label} — permits used</span>
+                  <span className={`font-semibold ${isAtLimit ? "text-red-600" : "text-gray-700"}`}>
+                    {selectedUnitInfo.active_permits} / {selectedUnitInfo.max_vehicles}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${isAtLimit ? "bg-red-500" : "bg-blue-500"}`}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (selectedUnitInfo.active_permits / selectedUnitInfo.max_vehicles) * 100
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="flex gap-3 pt-2">
               <button type="button" onClick={() => setModalOpen(false)}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
                 Cancel
               </button>
-              <button type="submit" disabled={isCreating || !selectedVehicle || myVehicles.length === 0}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+              <button
+                type="submit"
+                disabled={isCreating || !selectedVehicle || myVehicles.length === 0 || isAtLimit}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 {isCreating ? "Creating..." : "Get permit"}
               </button>
             </div>
