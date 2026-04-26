@@ -11,6 +11,10 @@ import { ImportUnitsModal } from "@/components/import/ImportUnitsModal";
 type Unit = Tables<"units">;
 type UnitInsert = TablesInsert<"units">;
 
+// Extended form type that includes max_guest_vehicles until DB types are regenerated
+// after running the 20260426_add_max_guest_vehicles_to_units migration.
+type UnitFormData = UnitInsert & { max_guest_vehicles: number };
+
 type UnitWithResidents = Unit & {
   unit_members: Array<{
     user_id: string;
@@ -56,7 +60,7 @@ export default function UnitsPage() {
     a.click();
   }
 
-  const [formData, setFormData] = useState<UnitInsert>({
+  const [formData, setFormData] = useState<UnitFormData>({
     property_id: propertyId,
     unit_label: "",
     building: null,
@@ -133,8 +137,7 @@ export default function UnitsPage() {
       building: unit.building,
       floor: unit.floor,
       max_vehicles: unit.max_vehicles,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      max_guest_vehicles: (unit as any).max_guest_vehicles ?? 1,
+      max_guest_vehicles: (unit as Unit & { max_guest_vehicles?: number }).max_guest_vehicles ?? 1,
       notes: unit.notes,
     });
     setModalOpen(true);
@@ -148,7 +151,7 @@ export default function UnitsPage() {
     setCodeCopied(false);
   }
 
-  function handleInputChange(field: keyof UnitInsert, value: string | number | null) {
+  function handleInputChange(field: keyof UnitFormData, value: string | number | null) {
     setFormData((prev) => ({ ...prev, [field]: value === "" ? null : value }));
   }
 
@@ -157,11 +160,13 @@ export default function UnitsPage() {
     if (!formData.unit_label?.trim()) { setError("Unit label is required"); return; }
     setIsSaving(true);
     try {
+      // Cast to unknown first so max_guest_vehicles (not yet in generated types) is included
+      const payload = formData as unknown as UnitInsert;
       if (editingUnit) {
-        const { error: e } = await supabase.from("units").update(formData).eq("id", editingUnit.id);
+        const { error: e } = await supabase.from("units").update(payload).eq("id", editingUnit.id);
         if (e) throw e;
       } else {
-        const { error: e } = await supabase.from("units").insert([formData]);
+        const { error: e } = await supabase.from("units").insert([payload]);
         if (e) throw e;
       }
       await loadUnits();
@@ -272,8 +277,7 @@ export default function UnitsPage() {
                   <td className="px-4 py-3 text-gray-500">{unit.building ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.floor ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-500">{unit.max_vehicles}</td>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <td className="px-4 py-3 text-gray-500">{(unit as any).max_guest_vehicles ?? 1}</td>
+                  <td className="px-4 py-3 text-gray-500">{(unit as Unit & { max_guest_vehicles?: number }).max_guest_vehicles ?? 1}</td>
                   <td className="px-4 py-3">
                     {unit.unit_members.length === 0 ? (
                       <span className="text-xs text-gray-400">No residents</span>
@@ -395,9 +399,8 @@ export default function UnitsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Max Guest Vehicles</label>
               <input
                 type="number"
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                value={(formData as any).max_guest_vehicles ?? 1}
-                onChange={(e) => handleInputChange("max_guest_vehicles" as keyof UnitInsert, parseInt(e.target.value))}
+                value={formData.max_guest_vehicles ?? 1}
+                onChange={(e) => handleInputChange("max_guest_vehicles", parseInt(e.target.value))}
                 min="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
