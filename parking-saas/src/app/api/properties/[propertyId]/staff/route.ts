@@ -94,7 +94,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     );
   }
 
-  const { error: insertError } = await supabase
+  const { error: insertError } = await (supabase as any)
     .from("property_members")
     .insert({ property_id: propertyId, user_id: profile.id, role });
 
@@ -127,7 +127,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
   const supabase = createServiceRoleClient();
 
-  const { error } = await supabase
+  const { error } = await (supabase as any)
     .from("property_members")
     .update({ role })
     .eq("property_id", propertyId)
