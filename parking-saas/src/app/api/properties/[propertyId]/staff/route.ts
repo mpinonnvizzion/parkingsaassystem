@@ -4,7 +4,8 @@ import { createServiceRoleClient } from "@/lib/supabase/server";
 type Params = { params: Promise<{ propertyId: string }> };
 
 const STAFF_ROLES = ["property_admin", "staff", "patrol_officer"] as const;
-const ALL_STAFF_ROLES = ["super_admin", "org_admin", "property_admin", "staff", "patrol_officer"];
+// Cast as any[] to bypass stale generated types that don't include patrol_officer yet
+const ALL_STAFF_ROLES = ["super_admin", "org_admin", "property_admin", "staff", "patrol_officer"] as any[];
 
 // ─── GET: list all non-resident members ──────────────────────────────────────
 
