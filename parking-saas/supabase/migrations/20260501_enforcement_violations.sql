@@ -1,20 +1,17 @@
 -- =============================================================================
--- Migration: Enforcement & Violations
+-- Migration: Enforcement & Violations (step 2 of 2)
 -- Task: 868jd9muk
 --
--- 1. Adds patrol_officer to the member_role enum
--- 2. Creates violation_status enum
--- 3. Creates violations table with indexes, RLS, and updated_at trigger
--- 4. Creates lookup_plate_for_enforcement() SECURITY DEFINER RPC
--- 5. Creates violation-photos Storage bucket with access policies
+-- Requires 20260501_add_patrol_officer_role.sql to be run first so that
+-- the patrol_officer enum value is committed before it is referenced here.
+--
+-- 1. Creates violation_status enum
+-- 2. Creates violations table with indexes, RLS, and updated_at trigger
+-- 3. Creates lookup_plate_for_enforcement() SECURITY DEFINER RPC
+-- 4. Creates violation-photos Storage bucket with access policies
 -- =============================================================================
 
--- ─── 1. Add patrol_officer role ───────────────────────────────────────────────
--- Must run outside a transaction block. In the Supabase SQL editor this is fine.
-
-ALTER TYPE member_role ADD VALUE IF NOT EXISTS 'patrol_officer';
-
--- ─── 2. violation_status enum ─────────────────────────────────────────────────
+-- ─── 1. violation_status enum ─────────────────────────────────────────────────
 
 DO $$
 BEGIN

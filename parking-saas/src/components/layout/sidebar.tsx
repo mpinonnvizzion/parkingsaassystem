@@ -74,7 +74,7 @@ export function Sidebar() {
 
   const isStaff = role && STAFF_ROLES.includes(role);
   const navItems =
-    role === "patrol_officer"
+    (role as string) === "patrol_officer"
       ? patrolNavItems
       : isStaff
       ? adminNavItems
