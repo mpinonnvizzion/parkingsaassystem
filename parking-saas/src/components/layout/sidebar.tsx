@@ -14,6 +14,12 @@ const adminNavItems = [
   { label: "Settings", href: "/settings", icon: "settings" },
 ];
 
+// Patrol officer nav — plate lookup and enforcement only
+const patrolNavItems = [
+  { label: "Overview", href: "", icon: "dashboard" },
+  { label: "Enforcement", href: "/enforcement", icon: "shield" },
+];
+
 // Resident nav items — simplified view
 const residentNavItems = [
   { label: "Overview", href: "", icon: "dashboard" },
@@ -21,7 +27,7 @@ const residentNavItems = [
   { label: "Vehicles", href: "/vehicles", icon: "car" },
 ];
 
-const STAFF_ROLES = ["super_admin", "org_admin", "property_admin", "staff"];
+const STAFF_ROLES = ["super_admin", "org_admin", "property_admin", "staff", "patrol_officer"];
 
 function NavIcon({ name, className }: { name: string; className?: string }) {
   const icons: Record<string, React.ReactNode> = {
@@ -67,7 +73,12 @@ export function Sidebar() {
   if (!propertyId) return null;
 
   const isStaff = role && STAFF_ROLES.includes(role);
-  const navItems = isStaff ? adminNavItems : residentNavItems;
+  const navItems =
+    role === "patrol_officer"
+      ? patrolNavItems
+      : isStaff
+      ? adminNavItems
+      : residentNavItems;
   const basePath = `/properties/${propertyId}`;
 
   return (
