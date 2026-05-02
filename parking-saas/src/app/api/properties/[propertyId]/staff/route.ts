@@ -64,27 +64,47 @@ export async function POST(req: NextRequest, { params }: Params) {
   }
 
   const supabase = createServiceRoleClient();
+  const normalizedEmail = email.toLowerCase().trim();
 
-  // Look up user by email in profiles
-  const { data: profile, error: profileError } = await supabase
+  // Try to find an existing account by email
+  let userId: string;
+  let fullName: string | null = null;
+  let wasInvited = false;
+
+  const { data: profile } = await supabase
     .from("profiles")
     .select("id, full_name, email")
-    .eq("email", email.toLowerCase().trim())
+    .eq("email", normalizedEmail)
     .single();
 
-  if (profileError || !profile) {
-    return NextResponse.json(
-      { error: "No account found with that email address. The user must sign up before they can be added as staff." },
-      { status: 404 }
+  if (profile) {
+    // Account exists — use it
+    userId = profile.id;
+    fullName = profile.full_name;
+  } else {
+    // No account yet — send a Supabase invitation email so they can set their password
+    const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+      normalizedEmail,
+      { data: { invited_as_staff: true } }
     );
+
+    if (inviteError || !invited?.user) {
+      return NextResponse.json(
+        { error: "Failed to send invitation: " + (inviteError?.message ?? "Unknown error") },
+        { status: 500 }
+      );
+    }
+
+    userId = invited.user.id;
+    wasInvited = true;
   }
 
-  // Check if already a member
+  // Check if already a member of this property
   const { data: existing } = await supabase
     .from("property_members")
     .select("role")
     .eq("property_id", propertyId)
-    .eq("user_id", profile.id)
+    .eq("user_id", userId)
     .single();
 
   if (existing) {
@@ -96,7 +116,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   const { error: insertError } = await (supabase as any)
     .from("property_members")
-    .insert({ property_id: propertyId, user_id: profile.id, role });
+    .insert({ property_id: propertyId, user_id: userId, role });
 
   if (insertError) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
@@ -104,10 +124,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   return NextResponse.json({
     success: true,
-    user_id: profile.id,
-    full_name: profile.full_name,
-    email: profile.email,
+    user_id: userId,
+    full_name: fullName,
+    email: normalizedEmail,
     role,
+    invited: wasInvited,
   });
 }
 
