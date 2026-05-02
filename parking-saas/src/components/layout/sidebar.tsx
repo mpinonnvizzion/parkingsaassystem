@@ -15,10 +15,10 @@ const adminNavItems = [
   { label: "Settings", href: "/settings", icon: "settings" },
 ];
 
-// Patrol officer nav — plate lookup and enforcement only
+// Patrol officer nav — plate lookup only
 const patrolNavItems = [
   { label: "Overview", href: "", icon: "dashboard" },
-  { label: "Enforcement", href: "/enforcement", icon: "shield" },
+  { label: "Patrol", href: "/patrol", icon: "shield" },
 ];
 
 // Resident nav items — simplified view
