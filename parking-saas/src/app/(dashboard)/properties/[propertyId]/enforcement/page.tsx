@@ -44,6 +44,7 @@ type ViolationRow = {
   unit_id: string | null;
   vehicle_id: string | null;
   tow_requested_at: string | null;
+  tow_requested_by: string | null;
   towed_at: string | null;
   resolved_at: string | null;
   units: { unit_label: string } | null;
@@ -130,6 +131,13 @@ export default function EnforcementPage() {
 
   // ── Photo detail modal ──────────────────────────────────────────────────────
   const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
+
+  // ── Violation detail modal ───────────────────────────────────────────────────
+  const [detailViolation, setDetailViolation] = useState<ViolationRow | null>(null);
+
+  // ── Tow confirmation dialog ──────────────────────────────────────────────────
+  const [towConfirm, setTowConfirm] = useState<{ id: string; plate: string } | null>(null);
+  const [isTowConfirming, setIsTowConfirming] = useState(false);
 
   // ─── Load violations ────────────────────────────────────────────────────────
 
@@ -267,6 +275,22 @@ export default function EnforcementPage() {
       .eq("property_id", propertyId);
 
     loadViolations();
+  }
+
+  // ─── Confirm tow request ─────────────────────────────────────────────────────
+
+  async function confirmTowRequest() {
+    if (!towConfirm) return;
+    setIsTowConfirming(true);
+    await handleStatusChange(towConfirm.id, "tow_requested");
+    // Sync detail panel if it's open for this violation
+    if (detailViolation?.id === towConfirm.id) {
+      setDetailViolation((v) =>
+        v ? { ...v, status: "tow_requested", tow_requested_at: new Date().toISOString() } : v
+      );
+    }
+    setTowConfirm(null);
+    setIsTowConfirming(false);
   }
 
   // ─── Access guard ────────────────────────────────────────────────────────────
@@ -521,9 +545,12 @@ export default function EnforcementPage() {
                   {violations.map((v) => (
                     <tr key={v.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <span className="font-mono font-semibold text-gray-900">
+                        <button
+                          onClick={() => setDetailViolation(v)}
+                          className="font-mono font-semibold text-gray-900 hover:text-blue-600 transition-colors text-left"
+                        >
                           {v.plate}
-                        </span>
+                        </button>
                         {v.notes && (
                           <p
                             className="text-xs text-gray-400 mt-0.5 max-w-[140px] truncate"
@@ -577,29 +604,66 @@ export default function EnforcementPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {STATUS_TRANSITIONS[v.status]?.length > 0 ? (
-                          <select
-                            defaultValue=""
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                handleStatusChange(v.id, e.target.value);
-                                e.target.value = "";
-                              }
-                            }}
-                            className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                          >
-                            <option value="" disabled>
-                              Update…
-                            </option>
-                            {STATUS_TRANSITIONS[v.status].map((next) => (
-                              <option key={next} value={next}>
-                                → {STATUS_LABELS[next]}
+                        <div className="flex flex-col gap-1.5">
+                          {/* Tow request — dedicated button for open/warning_issued */}
+                          {(v.status === "open" || v.status === "warning_issued") && (
+                            <button
+                              onClick={() => setTowConfirm({ id: v.id, plate: v.plate })}
+                              className="text-left text-xs font-semibold text-orange-600 hover:text-orange-700 transition-colors whitespace-nowrap"
+                            >
+                              🚛 Request Tow
+                            </button>
+                          )}
+
+                          {/* Tow outcome buttons once tow is requested */}
+                          {v.status === "tow_requested" && (
+                            <>
+                              <button
+                                onClick={() => handleStatusChange(v.id, "towed")}
+                                className="text-left text-xs font-semibold text-gray-700 hover:text-gray-900 transition-colors whitespace-nowrap"
+                              >
+                                ✓ Mark Towed
+                              </button>
+                              <button
+                                onClick={() => handleStatusChange(v.id, "dismissed")}
+                                className="text-left text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                              >
+                                Dismiss
+                              </button>
+                            </>
+                          )}
+
+                          {/* Other transitions (excluding tow_requested which has its own button) */}
+                          {STATUS_TRANSITIONS[v.status]
+                            ?.filter((s) => s !== "tow_requested" && v.status !== "tow_requested")
+                            .length > 0 && (
+                            <select
+                              defaultValue=""
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  handleStatusChange(v.id, e.target.value);
+                                  e.target.value = "";
+                                }
+                              }}
+                              className="text-xs border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                            >
+                              <option value="" disabled>
+                                Update…
                               </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <span className="text-xs text-gray-400">Closed</span>
-                        )}
+                              {STATUS_TRANSITIONS[v.status]
+                                .filter((s) => s !== "tow_requested")
+                                .map((next) => (
+                                  <option key={next} value={next}>
+                                    → {STATUS_LABELS[next]}
+                                  </option>
+                                ))}
+                            </select>
+                          )}
+
+                          {!STATUS_TRANSITIONS[v.status]?.length && (
+                            <span className="text-xs text-gray-400">Closed</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -737,6 +801,280 @@ export default function EnforcementPage() {
               >
                 {isSubmitting ? "Logging…" : "Log Violation"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tow Confirmation Dialog ───────────────────────────────────────────────── */}
+      {towConfirm && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !isTowConfirming)
+              setTowConfirm(null);
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="p-6">
+              <div className="flex items-center justify-center w-12 h-12 rounded-full bg-orange-100 mx-auto mb-4">
+                <span className="text-2xl">🚛</span>
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 text-center">
+                Request Tow for{" "}
+                <span className="font-mono">{towConfirm.plate}</span>?
+              </h2>
+              <p className="text-sm text-gray-500 text-center mt-2">
+                This will escalate the violation status to{" "}
+                <strong>Tow Requested</strong> and record the timestamp
+                and your user ID. Contact your towing company to
+                arrange removal.
+              </p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setTowConfirm(null)}
+                disabled={isTowConfirming}
+                className="flex-1 border border-gray-300 rounded-lg py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmTowRequest}
+                disabled={isTowConfirming}
+                className="flex-1 bg-orange-600 text-white rounded-lg py-2.5 text-sm font-semibold hover:bg-orange-700 disabled:opacity-50 transition-colors"
+              >
+                {isTowConfirming ? "Requesting…" : "Confirm Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Violation Detail Modal ────────────────────────────────────────────────── */}
+      {detailViolation && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setDetailViolation(null);
+          }}
+        >
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-100 flex items-start justify-between">
+              <div>
+                <span className="text-2xl font-mono font-black text-gray-900 tracking-widest">
+                  {detailViolation.plate}
+                </span>
+                {detailViolation.units?.unit_label && (
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Unit {detailViolation.units.unit_label}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs font-medium px-2.5 py-1 rounded-full border ${
+                    STATUS_COLORS[detailViolation.status] ??
+                    "bg-gray-50 text-gray-600 border-gray-200"
+                  }`}
+                >
+                  {STATUS_LABELS[detailViolation.status] ?? detailViolation.status}
+                </span>
+                <button
+                  onClick={() => setDetailViolation(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* Location + Notes */}
+              {(detailViolation.location || detailViolation.notes) && (
+                <div className="space-y-3">
+                  {detailViolation.location && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                        Location
+                      </p>
+                      <p className="text-sm text-gray-800">{detailViolation.location}</p>
+                    </div>
+                  )}
+                  {detailViolation.notes && (
+                    <div>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+                        Notes
+                      </p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">
+                        {detailViolation.notes}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Photo */}
+              {detailViolation.photo_url && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Photo Evidence
+                  </p>
+                  <button
+                    onClick={() => setPhotoModalUrl(detailViolation.photo_url!)}
+                    className="block w-full"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={detailViolation.photo_url}
+                      alt="Violation evidence"
+                      className="w-full rounded-xl object-cover max-h-48 hover:opacity-90 transition-opacity"
+                    />
+                  </button>
+                </div>
+              )}
+
+              {/* Timeline */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                  Timeline
+                </p>
+                <ol className="relative border-l-2 border-gray-200 ml-2 space-y-4">
+                  {/* Logged */}
+                  <li className="ml-5">
+                    <span className="absolute -left-[9px] w-4 h-4 rounded-full bg-red-500 border-2 border-white" />
+                    <p className="text-sm font-semibold text-gray-800">Violation logged</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(detailViolation.created_at).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </li>
+
+                  {/* Tow requested */}
+                  {detailViolation.tow_requested_at && (
+                    <li className="ml-5">
+                      <span className="absolute -left-[9px] w-4 h-4 rounded-full bg-orange-500 border-2 border-white" />
+                      <p className="text-sm font-semibold text-gray-800">Tow requested</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(detailViolation.tow_requested_at).toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </li>
+                  )}
+
+                  {/* Towed */}
+                  {detailViolation.towed_at && (
+                    <li className="ml-5">
+                      <span className="absolute -left-[9px] w-4 h-4 rounded-full bg-gray-500 border-2 border-white" />
+                      <p className="text-sm font-semibold text-gray-800">Vehicle towed</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(detailViolation.towed_at).toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </li>
+                  )}
+
+                  {/* Dismissed */}
+                  {detailViolation.resolved_at &&
+                    detailViolation.status === "dismissed" && (
+                    <li className="ml-5">
+                      <span className="absolute -left-[9px] w-4 h-4 rounded-full bg-gray-300 border-2 border-white" />
+                      <p className="text-sm font-semibold text-gray-500">Dismissed</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {new Date(detailViolation.resolved_at).toLocaleString([], {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </p>
+                    </li>
+                  )}
+                </ol>
+              </div>
+
+              {/* Actions — available transitions from within the detail view */}
+              {STATUS_TRANSITIONS[detailViolation.status]?.length > 0 && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">
+                    Actions
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {(detailViolation.status === "open" ||
+                      detailViolation.status === "warning_issued") && (
+                      <button
+                        onClick={() => {
+                          setDetailViolation(null);
+                          setTowConfirm({
+                            id: detailViolation.id,
+                            plate: detailViolation.plate,
+                          });
+                        }}
+                        className="bg-orange-600 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-orange-700 transition-colors"
+                      >
+                        🚛 Request Tow
+                      </button>
+                    )}
+                    {detailViolation.status === "tow_requested" && (
+                      <button
+                        onClick={async () => {
+                          await handleStatusChange(detailViolation.id, "towed");
+                          setDetailViolation((v) =>
+                            v ? { ...v, status: "towed", towed_at: new Date().toISOString() } : v
+                          );
+                        }}
+                        className="bg-gray-800 text-white rounded-lg px-4 py-2 text-sm font-semibold hover:bg-gray-900 transition-colors"
+                      >
+                        ✓ Mark Towed
+                      </button>
+                    )}
+                    {STATUS_TRANSITIONS[detailViolation.status]
+                      .filter((s) => s !== "tow_requested" && s !== "towed")
+                      .map((next) => (
+                        <button
+                          key={next}
+                          onClick={async () => {
+                            await handleStatusChange(detailViolation.id, next);
+                            setDetailViolation((v) =>
+                              v
+                                ? {
+                                    ...v,
+                                    status: next,
+                                    resolved_at:
+                                      next === "dismissed"
+                                        ? new Date().toISOString()
+                                        : v.resolved_at,
+                                  }
+                                : v
+                            );
+                          }}
+                          className="border border-gray-300 text-gray-700 rounded-lg px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
+                        >
+                          {STATUS_LABELS[next]}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
