@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth } from "@/contexts/auth-context";
 import { useProperty } from "@/contexts/property-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,7 +109,6 @@ function statusConfig(result: LookupResult): {
 export default function PatrolPage() {
   const params = useParams();
   const propertyId = params.propertyId as string;
-  const { user } = useAuth();
   const { role, currentProperty } = useProperty();
   const supabase = createClient();
 
@@ -133,8 +131,10 @@ export default function PatrolPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Success banner (shown on the patrol page after modal closes) ─────────────
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   // ── Lookup ───────────────────────────────────────────────────────────────────
 
@@ -176,7 +176,6 @@ export default function PatrolPage() {
       photo: null,
     });
     setSubmitError(null);
-    setSubmitSuccess(false);
     setIsModalOpen(true);
   }
 
@@ -212,15 +211,12 @@ export default function PatrolPage() {
       photoUrl = urlData.publicUrl;
     }
 
-    const { error } = await (supabase as any).from("violations").insert({
-      property_id: propertyId,
-      unit_id: result?.unit?.id ?? null,
-      plate: logForm.plate.toUpperCase().trim(),
-      location: logForm.location.trim() || null,
-      notes: logForm.notes.trim() || null,
-      photo_url: photoUrl,
-      logged_by: user?.id,
-      status: "open",
+    const { error } = await (supabase.rpc as any)("log_violation", {
+      p_property_id: propertyId,
+      p_plate: logForm.plate.toUpperCase().trim(),
+      p_location: logForm.location.trim() || null,
+      p_notes: logForm.notes.trim() || null,
+      p_photo_url: photoUrl,
     });
 
     if (error) {
@@ -229,19 +225,17 @@ export default function PatrolPage() {
       return;
     }
 
-    setSubmitSuccess(true);
     setIsSubmitting(false);
+    setIsModalOpen(false);
 
-    // Auto-close after showing success, then refresh result to show updated count
-    setTimeout(async () => {
-      setIsModalOpen(false);
-      // Re-run lookup to refresh violation count
-      const { data } = await (supabase.rpc as any)(
-        "lookup_plate_for_enforcement",
-        { p_property_id: propertyId, p_plate: logForm.plate }
-      );
-      if (data) setResult(data as LookupResult);
-    }, 1200);
+    // Show success banner, clear result so officer is ready for next lookup
+    const plate = logForm.plate.toUpperCase().trim();
+    setSuccessBanner(`✓ Violation logged for ${plate}`);
+    setResult(null);
+    setPlateInput("");
+
+    // Auto-dismiss banner after 4 seconds
+    setTimeout(() => setSuccessBanner(null), 4000);
   }
 
   // ─── Access guard ─────────────────────────────────────────────────────────────
@@ -266,6 +260,14 @@ export default function PatrolPage() {
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-4">
         {currentProperty?.name ?? "Patrol"}
       </p>
+
+      {/* ── Success banner ────────────────────────────────────────────────────── */}
+      {successBanner && (
+        <div className="bg-green-500 text-white rounded-2xl px-5 py-4 mb-4 flex items-center gap-3 shadow-sm">
+          <span className="text-xl">✓</span>
+          <span className="font-bold text-base">{successBanner}</span>
+        </div>
+      )}
 
       {/* ── Plate input ───────────────────────────────────────────────────────── */}
       <div className="flex gap-2 mb-4">
@@ -461,110 +463,96 @@ export default function PatrolPage() {
             </div>
 
             <div className="p-6 space-y-4">
-              {submitSuccess ? (
-                <div className="text-center py-6">
-                  <div className="text-5xl mb-3">✅</div>
-                  <p className="font-bold text-gray-900 text-lg">
-                    Violation logged
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">Closing…</p>
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Location
-                    </label>
-                    <input
-                      type="text"
-                      value={logForm.location}
-                      onChange={(e) =>
-                        setLogForm((f) => ({ ...f, location: e.target.value }))
-                      }
-                      placeholder="e.g. Level 2, Row B, Spot 14"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={logForm.location}
+                  onChange={(e) =>
+                    setLogForm((f) => ({ ...f, location: e.target.value }))
+                  }
+                  placeholder="e.g. Level 2, Row B, Spot 14"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Notes
-                    </label>
-                    <textarea
-                      value={logForm.notes}
-                      onChange={(e) =>
-                        setLogForm((f) => ({ ...f, notes: e.target.value }))
-                      }
-                      rows={3}
-                      placeholder="Any details about this violation…"
-                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Notes
+                </label>
+                <textarea
+                  value={logForm.notes}
+                  onChange={(e) =>
+                    setLogForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  rows={3}
+                  placeholder="Any details about this violation…"
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 text-base resize-none focus:outline-none focus:ring-2 focus:ring-red-500"
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                      Photo{" "}
-                      <span className="text-gray-400 font-normal">
-                        (optional)
-                      </span>
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) =>
-                        setLogForm((f) => ({
-                          ...f,
-                          photo: e.target.files?.[0] ?? null,
-                        }))
-                      }
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`w-full border-2 border-dashed rounded-xl py-4 text-sm font-medium transition-colors ${
-                        logForm.photo
-                          ? "border-green-400 bg-green-50 text-green-700"
-                          : "border-gray-300 text-gray-500 hover:border-gray-400"
-                      }`}
-                    >
-                      {logForm.photo ? (
-                        <>📷 {logForm.photo.name}</>
-                      ) : (
-                        "📷 Take photo or choose file"
-                      )}
-                    </button>
-                  </div>
-
-                  {submitError && (
-                    <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">
-                      {submitError}
-                    </p>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Photo{" "}
+                  <span className="text-gray-400 font-normal">
+                    (optional)
+                  </span>
+                </label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) =>
+                    setLogForm((f) => ({
+                      ...f,
+                      photo: e.target.files?.[0] ?? null,
+                    }))
+                  }
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`w-full border-2 border-dashed rounded-xl py-4 text-sm font-medium transition-colors ${
+                    logForm.photo
+                      ? "border-green-400 bg-green-50 text-green-700"
+                      : "border-gray-300 text-gray-500 hover:border-gray-400"
+                  }`}
+                >
+                  {logForm.photo ? (
+                    <>📷 {logForm.photo.name}</>
+                  ) : (
+                    "📷 Take photo or choose file"
                   )}
-                </>
+                </button>
+              </div>
+
+              {submitError && (
+                <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">
+                  {submitError}
+                </p>
               )}
             </div>
 
-            {!submitSuccess && (
-              <div className="px-6 pb-8 flex gap-3">
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  disabled={isSubmitting}
-                  className="flex-1 border border-gray-300 rounded-2xl py-4 text-base font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 bg-red-600 text-white rounded-2xl py-4 text-base font-black hover:bg-red-700 active:bg-red-800 disabled:opacity-50 transition-colors"
-                >
-                  {isSubmitting ? "Saving…" : "Log It"}
-                </button>
-              </div>
-            )}
+            <div className="px-6 pb-8 flex gap-3">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                disabled={isSubmitting}
+                className="flex-1 border border-gray-300 rounded-2xl py-4 text-base font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex-1 bg-red-600 text-white rounded-2xl py-4 text-base font-black hover:bg-red-700 active:bg-red-800 disabled:opacity-50 transition-colors"
+              >
+                {isSubmitting ? "Saving…" : "Log It"}
+              </button>
+            </div>
           </div>
         </div>
       )}
